@@ -1,4 +1,4 @@
-import type { Edge, Node } from "@xyflow/react";
+import { MarkerType, type Edge, type Node } from "@xyflow/react";
 import {
   buildTermGraph,
   type Diagram,
@@ -34,6 +34,10 @@ export interface FlowNodeData extends Record<string, unknown> {
   groupName?: string;
   /** visual role */
   variant: "center" | "term" | "info" | "note";
+  /** circle-node diameter in px (model panel) */
+  size?: number;
+  /** short label rendered inside a circle node */
+  shortLabel?: string;
   /** custom-diagram node kind: input | step | decision | output */
   kind?: string;
   /** term id — makes term nodes clickable */
@@ -207,25 +211,71 @@ export function buildCustomGraph(diagram: Extract<Diagram, { kind: "custom" }>) 
 }
 
 // ---------------------------------------------------------------------------
-// Model panel ("under the hood"): horizontal chain; backward-edge nodes drop
-// below their target (e.g. the training-cost side node).
+// Model panel ("under the hood"): classic node-link graph — circular nodes
+// scaled by importance, chained left to right; backward-edge nodes float
+// above their target (e.g. the training-cost side node) so the edge drops
+// straight into the circle without crossing captions.
 // ---------------------------------------------------------------------------
 
+const MODEL_CIRCLE_SIZE: Record<string, number> = {
+  moe: 210, // the hero: sparse activation is the whole story
+  mla: 180,
+  tokenizer: 165,
+  head: 155,
+  cost: 150,
+};
+
+const MODEL_SHORT_LABEL: Record<string, string> = {
+  tokenizer: "Tokenizer",
+  moe: "MoE",
+  mla: "MLA",
+  head: "Output",
+  cost: "$5.5M",
+};
+
+/** Smooth bezier link with an arrowhead and an optional pill label. */
+function circleEdge(partial: {
+  id: string;
+  source: string;
+  target: string;
+  label?: string;
+}): Edge {
+  return {
+    type: "default",
+    style: { stroke: ACCENT, strokeWidth: 2, opacity: 0.7 },
+    markerEnd: { type: MarkerType.ArrowClosed, width: 20, height: 20, color: ACCENT },
+    labelStyle: {
+      fontSize: 11,
+      fontWeight: 600,
+      fill: INK_SOFT,
+      fontFamily: "Inter, ui-sans-serif, sans-serif",
+    },
+    labelBgStyle: { fill: "#fffdf9", fillOpacity: 1, stroke: LINE, strokeWidth: 1 },
+    labelBgPadding: [10, 5] as [number, number],
+    labelBgBorderRadius: 999,
+    ...partial,
+  } as Edge;
+}
+
 export function buildModelPanelGraph(panel: Extract<Diagram, { kind: "model" }>["panels"][number]) {
-  const STEP_X = 320;
-  const DROP_Y = 250;
+  const STEP_X = 360;
+  const ABOVE_Y = -300;
+
+  const sizeOf = (id: string) => MODEL_CIRCLE_SIZE[id] ?? 150;
 
   const pos = new Map<string, { x: number; y: number }>();
   panel.nodes.forEach((nd, i) => pos.set(nd.id, { x: i * STEP_X, y: 0 }));
 
   // Side nodes: any edge pointing "backwards" (to a node earlier in listed
-  // order) belongs to a side node — drop it below its target.
+  // order) belongs to a side node — float it above its target, centered on
+  // the target circle.
   for (const e of panel.edges) {
     const fromIdx = panel.nodes.findIndex((nd) => nd.id === e.from);
     const toIdx = panel.nodes.findIndex((nd) => nd.id === e.to);
     if (fromIdx > toIdx) {
       const target = pos.get(e.to)!;
-      pos.set(e.from, { x: target.x, y: DROP_Y });
+      const dx = (sizeOf(e.to) - sizeOf(e.from)) / 2;
+      pos.set(e.from, { x: target.x + dx, y: ABOVE_Y });
     }
   }
 
@@ -234,19 +284,20 @@ export function buildModelPanelGraph(panel: Extract<Diagram, { kind: "model" }>[
     const isSide = p.y !== 0;
     return {
       id: nd.id,
-      type: "infoNode",
+      type: "circleNode",
       position: p,
       data: {
         label: nd.label,
+        shortLabel: MODEL_SHORT_LABEL[nd.id] ?? nd.label,
         blurb: nd.blurb,
+        size: sizeOf(nd.id),
         variant: isSide ? "note" : "info",
-        kind: isSide ? undefined : "input",
       },
     };
   });
 
   const edges: Edge[] = panel.edges.map((e, i) =>
-    pillEdge({ id: `e-${i}`, source: e.from, target: e.to, label: e.label }),
+    circleEdge({ id: `e-${i}`, source: e.from, target: e.to, label: e.label }),
   );
 
   return { nodes, edges };

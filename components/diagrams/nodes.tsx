@@ -91,3 +91,43 @@ export function InfoNode(props: NodeProps) {
     </div>
   );
 }
+
+/** Circle node: classic node-link circle — paper fill, colored ring, short
+ *  label inside, full label + blurb captioned beneath. Used by the DeepSeek
+ *  model panel. The caption is absolutely positioned so React Flow edges
+ *  terminate exactly on the circle boundary rather than on caption text. */
+export function CircleNode(props: NodeProps) {
+  const d = useNodeData(props);
+  const size = d.size ?? 150;
+  const isNote = d.variant === "note";
+  const ring = isNote ? "#b45309" : "#0f766e";
+  const innerFont = Math.max(15, Math.round(size * 0.11));
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <div
+        className="flex h-full w-full items-center justify-center rounded-full bg-[#fffdf9] text-center shadow-[0_2px_14px_rgba(28,25,23,0.08)]"
+        style={{ border: `3px solid ${ring}` }}
+      >
+        <span
+          className="px-4 font-serif font-semibold leading-tight text-ink"
+          style={{ fontSize: innerFont }}
+        >
+          {d.shortLabel ?? d.label}
+        </span>
+      </div>
+      <div className="pointer-events-none absolute left-1/2 top-full z-10 w-max max-w-[230px] -translate-x-1/2 pt-2.5 text-center">
+        {isNote && (
+          <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#b45309]">
+            One-time cost
+          </div>
+        )}
+        <div className="font-serif text-[15px] font-semibold leading-tight text-ink">
+          {d.label}
+        </div>
+        {d.blurb && (
+          <p className="mt-1 text-xs leading-snug text-ink-soft">{d.blurb}</p>
+        )}
+      </div>
+    </div>
+  );
+}

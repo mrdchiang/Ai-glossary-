@@ -7,12 +7,13 @@ import {
   type Edge,
   type NodeTypes,
 } from "@xyflow/react";
-import { InfoNode, TermNode } from "./nodes";
+import { CircleNode, InfoNode, TermNode } from "./nodes";
 import type { FlowNode, FlowNodeData } from "../../lib/diagrams";
 
 const nodeTypes: NodeTypes = {
   termNode: TermNode,
   infoNode: InfoNode,
+  circleNode: CircleNode,
 };
 
 interface GraphCanvasProps {

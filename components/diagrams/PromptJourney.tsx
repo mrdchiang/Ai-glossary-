@@ -51,6 +51,16 @@ function useAnimatedNumber(value: number, reduced: boolean): number {
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
 
+const JOURNEY_SHORT_LABEL: Record<string, string> = {
+  words: "Your words",
+  tokens: "Tokens",
+  embedding: "Embed",
+  routing: "MoE",
+  attention: "Attention",
+  decode: "Decode",
+  response: "Reply",
+};
+
 function promptFor(v: number): { text: string; pasted: boolean } {
   if (v < 0.34)
     return { text: "\u201CSummarize the pricing section in 5 bullets.\u201D", pasted: false };
@@ -131,49 +141,51 @@ export function PromptJourney({ panel }: { panel: Panel }) {
         </div>
       </div>
 
-      {/* ---- pipeline ---- */}
-      <div className="mt-5 overflow-x-auto pb-2">
-        <ol className="flex min-w-[760px] items-stretch gap-0">
+      {/* ---- pipeline: circles in a chain ---- */}
+      <div className="mt-5 overflow-x-auto px-1 pb-2 pt-4">
+        <ol className="flex min-w-[1140px] items-start">
           {panel.nodes.map((node, i) => {
             const isDecode = node.id === "decode";
             const isLast = i === panel.nodes.length - 1;
             return (
-              <li key={node.id} className="flex flex-1 items-stretch">
-                <div
-                  className={`flex flex-1 flex-col rounded-xl border p-3.5 ${
-                    isDecode
-                      ? "border-amber-line bg-amber-wash shadow-[0_2px_12px_rgba(180,83,9,0.12)]"
-                      : "border-line bg-card"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-[11px] font-semibold text-ink-faint">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
+              <li key={node.id} className="flex items-start">
+                <div className="flex w-[136px] flex-col items-center">
+                  <div
+                    className="relative flex h-[120px] w-[120px] shrink-0 items-center justify-center rounded-full bg-card text-center shadow-[0_2px_12px_rgba(28,25,23,0.07)]"
+                    style={{ border: `3px solid ${isDecode ? "#b45309" : "#0f766e"}` }}
+                  >
                     {isDecode && (
-                      <span className="rounded-full bg-[#b45309] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                      <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#b45309] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
                         latency lives here
                       </span>
                     )}
+                    <span className="px-3 font-serif text-[15px] font-semibold leading-tight text-ink">
+                      {JOURNEY_SHORT_LABEL[node.id] ?? node.label}
+                    </span>
                   </div>
-                  <div className="mt-1 font-serif text-[15px] font-semibold leading-tight">
-                    {node.label}
-                  </div>
-                  <div
-                    className={`mt-1.5 text-xs font-medium leading-snug tabular-nums ${
-                      isDecode ? "text-[#92400e]" : "text-accent-deep"
-                    }`}
-                  >
-                    {annotations[node.id] ?? node.blurb}
+                  <div className="mt-2.5 w-full text-center">
+                    <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                      {String(i + 1).padStart(2, "0")}
+                    </div>
+                    <div className="mt-0.5 font-serif text-[15px] font-semibold leading-tight text-ink">
+                      {node.label}
+                    </div>
+                    <div
+                      className={`mt-1 text-xs font-medium leading-snug tabular-nums ${
+                        isDecode ? "text-[#92400e]" : "text-accent-deep"
+                      }`}
+                    >
+                      {annotations[node.id] ?? node.blurb}
+                    </div>
                   </div>
                 </div>
                 {!isLast && (
-                  <div className="flex items-center px-1 text-ink-faint" aria-hidden>
-                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <div className="flex h-[120px] items-center px-1.5 text-accent" aria-hidden>
+                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
                       <path
-                        d="M6 3.5 11.5 9 6 14.5"
+                        d="M7 4.5 14.5 11 7 17.5"
                         stroke="currentColor"
-                        strokeWidth="2"
+                        strokeWidth="2.5"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       />
