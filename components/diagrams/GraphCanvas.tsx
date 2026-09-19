@@ -22,10 +22,11 @@ interface GraphCanvasProps {
   /** Called with a term id when a clickable term node is pressed. */
   onTermClick?: (termId: string) => void;
   height?: number;
+  minZoom?: number;
 }
 
 /** Shared React Flow wrapper: styled background, pristine layout, pill labels. */
-export function GraphCanvas({ nodes, edges, onTermClick, height = 440 }: GraphCanvasProps) {
+export function GraphCanvas({ nodes, edges, onTermClick, height = 440, minZoom = 0.35 }: GraphCanvasProps) {
   return (
     <div
       className="w-full overflow-hidden rounded-xl border border-line bg-paper-deep/40"
@@ -46,7 +47,7 @@ export function GraphCanvas({ nodes, edges, onTermClick, height = 440 }: GraphCa
         elementsSelectable={false}
         fitView
         fitViewOptions={{ padding: 0.22, maxZoom: 1 }}
-        minZoom={0.35}
+        minZoom={minZoom}
         maxZoom={1.6}
         proOptions={{ hideAttribution: false }}
       >

@@ -71,6 +71,25 @@ export function pillEdge(partial: Partial<Edge> & { id: string; source: string; 
   } as Edge;
 }
 
+/** Pick the handle sides facing each other for an edge from `from` to `to`.
+ *  Every custom node declares invisible top/right/bottom/left handles, so
+ *  edges attach on the sides that point at each other. */
+export function facingHandles(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+): { sourceHandle: string; targetHandle: string } {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0
+      ? { sourceHandle: "right", targetHandle: "left" }
+      : { sourceHandle: "left", targetHandle: "right" };
+  }
+  return dy >= 0
+    ? { sourceHandle: "bottom", targetHandle: "top" }
+    : { sourceHandle: "top", targetHandle: "bottom" };
+}
+
 function groupOf(groups: Group[], term: Term): Group | undefined {
   return groups.find((g) => g.id === term.group);
 }
@@ -127,20 +146,29 @@ export function buildAutoGraph(term: Term, terms: Term[], groups: Group[]) {
     });
   });
 
-  const edges: Edge[] = related.map((r) => {
+  const edges: Edge[] = related.map((r, i) => {
     const label = edgeLabel(r);
+    // Attach edges on the sides facing each other along the ellipse angle.
+    const angle = n === 1 ? 0 : (i / n) * Math.PI * 2 - Math.PI / 2;
+    const dir = { x: Math.cos(angle), y: Math.sin(angle) };
+    const handles =
+      r.direction === "outgoing"
+        ? facingHandles({ x: 0, y: 0 }, dir)
+        : facingHandles(dir, { x: 0, y: 0 });
     return r.direction === "outgoing"
       ? pillEdge({
           id: `e-${term.id}-${r.term.id}`,
           source: `term-${term.id}`,
           target: `term-${r.term.id}`,
           label,
+          ...handles,
         })
       : pillEdge({
           id: `e-${r.term.id}-${term.id}`,
           source: `term-${r.term.id}`,
           target: `term-${term.id}`,
           label,
+          ...handles,
         });
   });
 
@@ -196,12 +224,20 @@ export function buildCustomGraph(diagram: Extract<Diagram, { kind: "custom" }>) 
     });
   }
 
+  const pos = new Map<string, { x: number; y: number }>();
+  nodes.forEach((nd) => pos.set(nd.id, nd.position));
+
   const edges: Edge[] = diagram.edges.map((e, i) =>
     pillEdge({
       id: `e-${i}`,
       source: e.from,
       target: e.to,
       label: e.label,
+      // Attach on the sides facing each other (computed from node positions).
+      ...facingHandles(
+        pos.get(e.from) ?? { x: 0, y: 0 },
+        pos.get(e.to) ?? { x: 0, y: 0 },
+      ),
       // the loop-back edge reads better as a smooth curve
       type: e.label ? "default" : "smoothstep",
     }),
@@ -297,7 +333,18 @@ export function buildModelPanelGraph(panel: Extract<Diagram, { kind: "model" }>[
   });
 
   const edges: Edge[] = panel.edges.map((e, i) =>
-    circleEdge({ id: `e-${i}`, source: e.from, target: e.to, label: e.label }),
+    circleEdge({
+      id: `e-${i}`,
+      source: e.from,
+      target: e.to,
+      label: e.label,
+      // Attach on the sides facing each other: left/right along the chain,
+      // bottom/top for the cost node floating above its target.
+      ...facingHandles(
+        pos.get(e.from) ?? { x: 0, y: 0 },
+        pos.get(e.to) ?? { x: 0, y: 0 },
+      ),
+    }),
   );
 
   return { nodes, edges };

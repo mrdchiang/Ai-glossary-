@@ -60,7 +60,7 @@ export function ModelDiagram({ term }: { term: Term }) {
         <section>
           <PanelHeader index="01" title={underTheHood.title} caption={underTheHood.caption} />
           <div className="mt-4">
-            <GraphCanvas nodes={under.nodes} edges={under.edges} height={480} />
+            <GraphCanvas nodes={under.nodes} edges={under.edges} height={480} minZoom={0.18} />
           </div>
           <p className="mt-3 rounded-lg bg-paper-deep/70 px-4 py-3 text-[13px] leading-relaxed text-ink-soft">
             <strong className="text-ink">About that $5.5M figure:</strong> it covers the final

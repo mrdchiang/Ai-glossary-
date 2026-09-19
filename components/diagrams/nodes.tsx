@@ -1,10 +1,36 @@
 "use client";
 
-import type { NodeProps } from "@xyflow/react";
+import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { kindAccent, type FlowNodeData } from "../../lib/diagrams";
 
 function useNodeData(props: NodeProps) {
   return props.data as unknown as FlowNodeData;
+}
+
+const HANDLE_SIDES = [
+  { id: "top", position: Position.Top },
+  { id: "right", position: Position.Right },
+  { id: "bottom", position: Position.Bottom },
+  { id: "left", position: Position.Left },
+] as const;
+
+/**
+ * Invisible connection points on all four sides. React Flow v12 drops edges
+ * entirely for nodes without handles, so every custom node declares these.
+ * They're hidden and non-interactive — the diagrams are read-only.
+ */
+function NodeHandles() {
+  const hidden = { opacity: 0, pointerEvents: "none" } as const;
+  return (
+    <>
+      {HANDLE_SIDES.map(({ id, position }) => (
+        <Handle key={`s-${id}`} type="source" position={position} id={id} style={hidden} />
+      ))}
+      {HANDLE_SIDES.map(({ id, position }) => (
+        <Handle key={`t-${id}`} type="target" position={position} id={id} style={hidden} />
+      ))}
+    </>
+  );
 }
 
 const cardBase =
@@ -16,11 +42,12 @@ export function TermNode(props: NodeProps) {
   const isCenter = d.variant === "center";
   return (
     <div
-      className={`${cardBase} ${isCenter ? "border-accent/40 ring-2 ring-accent/15" : "border-line"} ${
+      className={`${cardBase} relative ${isCenter ? "border-accent/40 ring-2 ring-accent/15" : "border-line"} ${
         d.clickable ? "cursor-pointer hover:shadow-[0_6px_20px_rgba(15,118,110,0.18)]" : ""
       }`}
       style={{ width: isCenter ? 300 : 250 }}
     >
+      <NodeHandles />
       <div
         className="h-1.5 rounded-t-2xl"
         style={{ backgroundColor: d.groupColor ?? "#a8a29e" }}
@@ -58,9 +85,10 @@ export function InfoNode(props: NodeProps) {
   const accent = isNote ? "#b45309" : kindAccent(d.kind);
   return (
     <div
-      className={`${cardBase} ${isNote ? "border-amber-line bg-amber-wash" : "border-line"}`}
+      className={`${cardBase} relative ${isNote ? "border-amber-line bg-amber-wash" : "border-line"}`}
       style={{ width: 270 }}
     >
+      <NodeHandles />
       <div className="flex">
         <div
           className="w-1.5 shrink-0 rounded-l-2xl"
@@ -104,6 +132,7 @@ export function CircleNode(props: NodeProps) {
   const innerFont = Math.max(15, Math.round(size * 0.11));
   return (
     <div className="relative" style={{ width: size, height: size }}>
+      <NodeHandles />
       <div
         className="flex h-full w-full items-center justify-center rounded-full bg-[#fffdf9] text-center shadow-[0_2px_14px_rgba(28,25,23,0.08)]"
         style={{ border: `3px solid ${ring}` }}
@@ -115,7 +144,15 @@ export function CircleNode(props: NodeProps) {
           {d.shortLabel ?? d.label}
         </span>
       </div>
-      <div className="pointer-events-none absolute left-1/2 top-full z-10 w-max max-w-[230px] -translate-x-1/2 pt-2.5 text-center">
+      {/* Caption sits beneath the circle — except for note nodes, which float
+          above their target, so their caption goes on top to stay clear of
+          the edge dropping into the circle below. Absolutely positioned so
+          React Flow edges terminate exactly on the circle boundary. */}
+      <div
+        className={`pointer-events-none absolute left-1/2 z-10 w-max max-w-[230px] -translate-x-1/2 text-center ${
+          isNote ? "bottom-full pb-2.5" : "top-full pt-2.5"
+        }`}
+      >
         {isNote && (
           <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#b45309]">
             One-time cost
