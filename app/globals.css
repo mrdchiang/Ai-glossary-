@@ -1,1 +1,148 @@
 @import "tailwindcss";
+@import "@xyflow/react/dist/style.css";
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: var(--font-fraunces), Georgia, "Times New Roman", serif;
+
+  --color-paper: #faf7f1;
+  --color-paper-deep: #f2ecdf;
+  --color-card: #fffdf9;
+  --color-ink: #1c1917;
+  --color-ink-soft: #57534e;
+  --color-ink-faint: #a8a29e;
+  --color-line: #e8e0cf;
+  --color-line-soft: #f0e9d8;
+
+  --color-accent: #0f766e;
+  --color-accent-deep: #115e59;
+  --color-accent-tint: #e7f3f1;
+  --color-amber-wash: #fdf3e0;
+  --color-amber-line: #f0dfb8;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  background-image: radial-gradient(ellipse 80% 50% at 50% -10%, #fffdf8 0%, transparent 70%);
+}
+
+::selection {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+/* ---- term list scrollbar ---- */
+.term-list-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.term-list-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.term-list-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 999px;
+}
+.term-list-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-faint);
+}
+
+/* ---- range slider ---- */
+input[type="range"].vagueness {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-accent) 0%, #d97706 55%, #dc2626 100%);
+  outline-offset: 4px;
+}
+input[type="range"].vagueness::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #fffdf9;
+  border: 3px solid var(--color-ink);
+  box-shadow: 0 2px 8px rgba(28, 25, 23, 0.25);
+  cursor: grab;
+}
+input[type="range"].vagueness::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #fffdf9;
+  border: 3px solid var(--color-ink);
+  box-shadow: 0 2px 8px rgba(28, 25, 23, 0.25);
+  cursor: grab;
+}
+
+/* ---- React Flow theme overrides ---- */
+.react-flow__attribution {
+  background: transparent;
+  color: var(--color-ink-faint);
+  font-size: 10px;
+}
+.react-flow__attribution a {
+  color: var(--color-ink-faint);
+}
+.react-flow__node {
+  font-family: var(--font-sans);
+}
+.react-flow__edge-label {
+  font-family: var(--font-sans);
+}
+.rf-panel-dark .react-flow__attribution {
+  color: var(--color-ink-faint);
+}
+
+/* ---- connector strip flow animation ---- */
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+.flow-dash {
+  stroke-dasharray: 7 7;
+  animation: dash-flow 1.2s linear infinite;
+}
+
+/* ---- gentle entrance ---- */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise-in {
+  animation: rise-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.rise-in-1 { animation-delay: 0.05s; }
+.rise-in-2 { animation-delay: 0.12s; }
+.rise-in-3 { animation-delay: 0.19s; }
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .flow-dash {
+    animation: none;
+  }
+}

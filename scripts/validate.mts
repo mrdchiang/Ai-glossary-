@@ -1,4 +1,4 @@
-import { validateContent } from "../lib/terms.js";
+import { validateContent } from "../lib/content.js";
 
 try {
   const { groups, terms } = validateContent();

@@ -27,12 +27,27 @@ content/
   groups.json          # the 5 term groups (id, name, tagline, color, sort)
   terms/*.json         # one JSON file per term — this is the CMS for v1
 lib/
-  terms.ts             # Zod schemas, content loader, graph builder, validateContent()
+  terms.ts             # Zod schemas, types, buildTermGraph() — client-safe (no node builtins)
+  content.ts           # server-only: loadGroups(), loadTerms(), validateContent()
+  diagrams.ts          # shared diagram helpers: edge verbs, pill edges, graph layout builders
 scripts/
   validate.mts         # `npm run validate` entrypoint (run with tsx)
 app/
-  page.tsx             # home: groups + term cards
-  glossary/[slug]/page.tsx   # term detail (definition, example, footnotes, connections)
+  page.tsx             # home: hero, DeepSeek case-study spotlight, groups + term cards
+  glossary/page.tsx    # glossary browser (defaults to first term)
+  glossary/[slug]/page.tsx   # glossary browser with term preselected (deep linkable)
+components/
+  glossary/
+    GlossaryBrowser.tsx  # two-panel browser: searchable/filterable list + detail
+    TermDetail.tsx       # tagline, definition, example callout, chips, footnotes, diagram button
+  diagrams/
+    DiagramModal.tsx   # modal shell: ESC/backdrop close, picks diagram by kind
+    GraphCanvas.tsx    # shared React Flow wrapper (themed nodes, pill edge labels)
+    nodes.tsx          # TermNode + InfoNode custom node renderers
+    AutoGraph.tsx      # center term + 1-hop neighbors, derived from edges
+    CustomDiagram.tsx  # hand-authored graphs (agentic loop)
+    ModelDiagram.tsx   # two-panel model case study (DeepSeek)
+    PromptJourney.tsx  # interactive pipeline + vagueness slider + token-burn meter
 ```
 
 ## Adding a term
@@ -85,9 +100,10 @@ app/
 ## Roadmap
 
 - **M0–M1** (done): repo scaffold, content pipeline, 6 anchor terms.
-- **M2–M3**: two-panel glossary browser UI + term detail design pass.
-- **M4–M5**: React Flow diagrams — auto graphs for every term, custom agentic-loop
-  diagram, DeepSeek two-panel case study.
-- **M6–M8**: home/about/models pages, polish, content expansion to ~25 terms, launch.
+- **M2–M5** (done): two-panel glossary browser UI (search, group filters, deep
+  links), term detail design, React Flow diagrams — auto graphs for every term,
+  custom agentic-loop diagram, DeepSeek two-panel case study with interactive
+  token-burn visual.
+- **M6–M8**: home/about/models pages polish, content expansion to ~25 terms, launch.
 - **Post-v1**: review queue, Postgres backend, auto-discovery cron with a human
   review gate (never auto-publish).
