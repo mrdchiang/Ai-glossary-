@@ -98,6 +98,12 @@ input[type="range"].vagueness::-moz-range-thumb {
 .react-flow__edge-label {
   font-family: var(--font-sans);
 }
+/* Edge pills (relationship labels) paint above node cards. React Flow's DOM
+   order is edges → edge labels → nodes, so without this, pills at edge
+   midpoints tuck half-behind the cards they sit between. */
+.react-flow__edgelabel-renderer {
+  z-index: 11;
+}
 .rf-panel-dark .react-flow__attribution {
   color: var(--color-ink-faint);
 }

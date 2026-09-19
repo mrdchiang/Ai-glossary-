@@ -54,22 +54,19 @@ const INK_SOFT = "#57534e";
 const LINE = "#e8e0cf";
 const ACCENT = "#0f766e";
 
-/** Pill-styled edge label shared by every diagram. */
-export function pillEdge(partial: Partial<Edge> & { id: string; source: string; target: string }): Edge {
+/** Pill-styled edge: the line renders in SVG, the label as an HTML pill in the
+ *  edge-label layer (above node cards). See components/diagrams/edges.tsx. */
+export function pillEdge(
+  partial: Partial<Edge> & { id: string; source: string; target: string },
+  curve: "bezier" | "smoothstep" = "smoothstep",
+): Edge {
+  const { type: _ignored, data: partialData, ...rest } = partial;
   return {
-    type: "smoothstep",
+    type: "pill",
     animated: false,
     style: { stroke: "#b8ab8f", strokeWidth: 1.75 },
-    labelStyle: {
-      fontSize: 11,
-      fontWeight: 600,
-      fill: INK_SOFT,
-      fontFamily: "Inter, ui-sans-serif, sans-serif",
-    },
-    labelBgStyle: { fill: "#fffdf9", fillOpacity: 1, stroke: LINE, strokeWidth: 1 },
-    labelBgPadding: [10, 5] as [number, number],
-    labelBgBorderRadius: 999,
-    ...partial,
+    ...rest,
+    data: { ...((partialData as Record<string, unknown> | undefined) ?? {}), curve },
   } as Edge;
 }
 
@@ -229,21 +226,34 @@ export function buildCustomGraph(diagram: Extract<Diagram, { kind: "custom" }>) 
   const pos = new Map<string, { x: number; y: number }>();
   nodes.forEach((nd) => pos.set(nd.id, nd.position));
 
-  const edges: Edge[] = diagram.edges.map((e, i) =>
-    pillEdge({
-      id: `e-${i}`,
-      source: e.from,
-      target: e.to,
-      label: e.label,
-      // Attach on the sides facing each other (computed from node positions).
-      ...facingHandles(
-        pos.get(e.from) ?? { x: 0, y: 0 },
-        pos.get(e.to) ?? { x: 0, y: 0 },
-      ),
+  const edges: Edge[] = diagram.edges.map((e, i) => {
+    // Labeled edges that terminate on the center node (e.g. "yes — report
+    // back") route from the source's bottom handle into the center card's
+    // side handle. The curve bows outward so the pill label sits clear of
+    // the center card instead of tucking behind its edge.
+    const intoCenter = center !== undefined && e.to === center.id && e.label;
+    const handles = intoCenter
+      ? {
+          sourceHandle: "bottom",
+          targetHandle: (pos.get(e.from)?.x ?? 0) < 0 ? "left" : "right",
+        }
+      : // Attach on the sides facing each other (computed from node positions).
+        facingHandles(
+          pos.get(e.from) ?? { x: 0, y: 0 },
+          pos.get(e.to) ?? { x: 0, y: 0 },
+        );
+    return pillEdge(
+      {
+        id: `e-${i}`,
+        source: e.from,
+        target: e.to,
+        label: e.label,
+        ...handles,
+      },
       // the loop-back edge reads better as a smooth curve
-      type: e.label ? "default" : "smoothstep",
-    }),
-  );
+      e.label ? "bezier" : "smoothstep",
+    );
+  });
 
   return { nodes, edges };
 }
