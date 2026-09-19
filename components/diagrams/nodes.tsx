@@ -121,8 +121,8 @@ export function InfoNode(props: NodeProps) {
 }
 
 /** Circle node: classic node-link circle — paper fill, colored ring, short
- *  label inside, full label + blurb captioned beneath. Used by the DeepSeek
- *  model panel. The caption is absolutely positioned so React Flow edges
+ *  label inside, full label + blurb captioned beneath (or above for floating
+ *  side nodes). The caption is absolutely positioned so React Flow edges
  *  terminate exactly on the circle boundary rather than on caption text. */
 export function CircleNode(props: NodeProps) {
   const d = useNodeData(props);
@@ -130,6 +130,10 @@ export function CircleNode(props: NodeProps) {
   const isNote = d.variant === "note";
   const ring = isNote ? "#b45309" : "#0f766e";
   const innerFont = Math.max(15, Math.round(size * 0.11));
+  // Side nodes that float above their target keep the caption on top; a node
+  // that sits in the normal flow (even a note like the training-cost node)
+  // captions below like everything else.
+  const captionAbove = d.captionAbove ?? isNote;
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <NodeHandles />
@@ -144,13 +148,13 @@ export function CircleNode(props: NodeProps) {
           {d.shortLabel ?? d.label}
         </span>
       </div>
-      {/* Caption sits beneath the circle — except for note nodes, which float
-          above their target, so their caption goes on top to stay clear of
-          the edge dropping into the circle below. Absolutely positioned so
-          React Flow edges terminate exactly on the circle boundary. */}
+      {/* Caption sits beneath the circle by default — note nodes that float
+          above their target caption on top to stay clear of the edge
+          dropping into the circle below. Absolutely positioned so React
+          Flow edges terminate exactly on the circle boundary. */}
       <div
-        className={`pointer-events-none absolute left-1/2 z-10 w-max max-w-[230px] -translate-x-1/2 text-center ${
-          isNote ? "bottom-full pb-2.5" : "top-full pt-2.5"
+        className={`pointer-events-none absolute left-1/2 z-10 w-max max-w-[200px] -translate-x-1/2 text-center ${
+          captionAbove ? "bottom-full pb-2.5" : "top-full pt-2.5"
         }`}
       >
         {isNote && (
@@ -158,11 +162,11 @@ export function CircleNode(props: NodeProps) {
             One-time cost
           </div>
         )}
-        <div className="font-serif text-[15px] font-semibold leading-tight text-ink">
+        <div className="font-serif text-base font-semibold leading-tight text-ink">
           {d.label}
         </div>
         {d.blurb && (
-          <p className="mt-1 text-xs leading-snug text-ink-soft">{d.blurb}</p>
+          <p className="mt-1 text-[13px] leading-snug text-ink-soft">{d.blurb}</p>
         )}
       </div>
     </div>

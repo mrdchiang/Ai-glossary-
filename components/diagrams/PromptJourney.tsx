@@ -141,17 +141,17 @@ export function PromptJourney({ panel }: { panel: Panel }) {
         </div>
       </div>
 
-      {/* ---- pipeline: circles in a chain ---- */}
-      <div className="mt-5 overflow-x-auto px-1 pb-2 pt-4">
-        <ol className="flex min-w-[1140px] items-start">
+      {/* ---- pipeline: circles in a vertical chain ---- */}
+      <div className="mt-5 px-1 pb-2 pt-4">
+        <ol className="flex flex-col items-center">
           {panel.nodes.map((node, i) => {
             const isDecode = node.id === "decode";
             const isLast = i === panel.nodes.length - 1;
             return (
-              <li key={node.id} className="flex items-start">
-                <div className="flex w-[136px] flex-col items-center">
+              <li key={node.id} className="flex flex-col items-center">
+                <div className="flex flex-col items-center">
                   <div
-                    className="relative flex h-[120px] w-[120px] shrink-0 items-center justify-center rounded-full bg-card text-center shadow-[0_2px_12px_rgba(28,25,23,0.07)]"
+                    className="relative flex h-[112px] w-[112px] shrink-0 items-center justify-center rounded-full bg-card text-center shadow-[0_2px_12px_rgba(28,25,23,0.07)]"
                     style={{ border: `3px solid ${isDecode ? "#b45309" : "#0f766e"}` }}
                   >
                     {isDecode && (
@@ -159,11 +159,11 @@ export function PromptJourney({ panel }: { panel: Panel }) {
                         latency lives here
                       </span>
                     )}
-                    <span className="px-3 font-serif text-[15px] font-semibold leading-tight text-ink">
+                    <span className="px-3 font-serif text-sm font-semibold leading-tight text-ink">
                       {JOURNEY_SHORT_LABEL[node.id] ?? node.label}
                     </span>
                   </div>
-                  <div className="mt-2.5 w-full text-center">
+                  <div className="mt-2.5 max-w-[300px] text-center">
                     <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
                       {String(i + 1).padStart(2, "0")}
                     </div>
@@ -180,10 +180,10 @@ export function PromptJourney({ panel }: { panel: Panel }) {
                   </div>
                 </div>
                 {!isLast && (
-                  <div className="flex h-[120px] items-center px-1.5 text-accent" aria-hidden>
+                  <div className="flex items-center py-2 text-accent" aria-hidden>
                     <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
                       <path
-                        d="M7 4.5 14.5 11 7 17.5"
+                        d="M4.5 7 11 14.5 17.5 7"
                         stroke="currentColor"
                         strokeWidth="2.5"
                         strokeLinecap="round"

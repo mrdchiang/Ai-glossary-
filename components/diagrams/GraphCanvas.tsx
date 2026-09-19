@@ -23,10 +23,12 @@ interface GraphCanvasProps {
   onTermClick?: (termId: string) => void;
   height?: number;
   minZoom?: number;
+  /** fitView padding — tighter for dense bespoke layouts, roomier for auto graphs */
+  fitPadding?: number;
 }
 
 /** Shared React Flow wrapper: styled background, pristine layout, pill labels. */
-export function GraphCanvas({ nodes, edges, onTermClick, height = 440, minZoom = 0.35 }: GraphCanvasProps) {
+export function GraphCanvas({ nodes, edges, onTermClick, height = 440, minZoom = 0.35, fitPadding = 0.22 }: GraphCanvasProps) {
   return (
     <div
       className="w-full overflow-hidden rounded-xl border border-line bg-paper-deep/40"
@@ -46,7 +48,7 @@ export function GraphCanvas({ nodes, edges, onTermClick, height = 440, minZoom =
         nodesConnectable={false}
         elementsSelectable={false}
         fitView
-        fitViewOptions={{ padding: 0.22, maxZoom: 1 }}
+        fitViewOptions={{ padding: fitPadding, maxZoom: 1 }}
         minZoom={minZoom}
         maxZoom={1.6}
         proOptions={{ hideAttribution: false }}

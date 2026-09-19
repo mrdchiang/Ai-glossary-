@@ -38,6 +38,8 @@ export interface FlowNodeData extends Record<string, unknown> {
   size?: number;
   /** short label rendered inside a circle node */
   shortLabel?: string;
+  /** circle node: put the caption above the circle instead of below */
+  captionAbove?: boolean;
   /** custom-diagram node kind: input | step | decision | output */
   kind?: string;
   /** term id — makes term nodes clickable */
@@ -248,17 +250,20 @@ export function buildCustomGraph(diagram: Extract<Diagram, { kind: "custom" }>) 
 
 // ---------------------------------------------------------------------------
 // Model panel ("under the hood"): classic node-link graph — circular nodes
-// scaled by importance, chained left to right; backward-edge nodes float
-// above their target (e.g. the training-cost side node) so the edge drops
-// straight into the circle without crossing captions.
+// scaled by importance, laid out in two rows that snake down so the content
+// aspect matches the near-square panel. A single 5-across chain spans
+// ~1600px of flow coordinates in a ~530px panel, forcing fitView to zoom to
+// ~0.2 and rendering every circle tiny; the two-row layout keeps zoom near
+// 0.8 with legible labels. Backward-edge nodes (e.g. the training-cost side
+// node) sit directly beneath their target with a labeled edge rising into it.
 // ---------------------------------------------------------------------------
 
 const MODEL_CIRCLE_SIZE: Record<string, number> = {
-  moe: 210, // the hero: sparse activation is the whole story
-  mla: 180,
-  tokenizer: 165,
-  head: 155,
-  cost: 150,
+  moe: 150, // the hero: sparse activation is the whole story
+  mla: 135,
+  tokenizer: 130,
+  head: 125,
+  cost: 125,
 };
 
 const MODEL_SHORT_LABEL: Record<string, string> = {
@@ -294,58 +299,77 @@ function circleEdge(partial: {
 }
 
 export function buildModelPanelGraph(panel: Extract<Diagram, { kind: "model" }>["panels"][number]) {
-  const STEP_X = 360;
-  const ABOVE_Y = -300;
+  const ROW1_Y = 30;
+  const ROW2_Y = 300;
+  const COL_X = 240;
 
-  const sizeOf = (id: string) => MODEL_CIRCLE_SIZE[id] ?? 150;
+  const sizeOf = (id: string) => MODEL_CIRCLE_SIZE[id] ?? 130;
+  const indexOf = (id: string) => panel.nodes.findIndex((nd) => nd.id === id);
+  // A node whose edge points "backwards" (to a node earlier in listed order)
+  // is a side node — it sits beneath its target instead of in the chain.
+  const isSide = (id: string) =>
+    panel.edges.some((e) => e.from === id && indexOf(e.from) > indexOf(e.to));
+  const main = panel.nodes.filter((nd) => !isSide(nd.id));
+  const side = panel.nodes.filter((nd) => isSide(nd.id));
 
+  // Main chain: up to three across row 1, then the chain snakes down —
+  // continuing beneath the last column so each link stays short and vertical.
   const pos = new Map<string, { x: number; y: number }>();
-  panel.nodes.forEach((nd, i) => pos.set(nd.id, { x: i * STEP_X, y: 0 }));
-
-  // Side nodes: any edge pointing "backwards" (to a node earlier in listed
-  // order) belongs to a side node — float it above its target, centered on
-  // the target circle.
-  for (const e of panel.edges) {
-    const fromIdx = panel.nodes.findIndex((nd) => nd.id === e.from);
-    const toIdx = panel.nodes.findIndex((nd) => nd.id === e.to);
-    if (fromIdx > toIdx) {
-      const target = pos.get(e.to)!;
-      const dx = (sizeOf(e.to) - sizeOf(e.from)) / 2;
-      pos.set(e.from, { x: target.x + dx, y: ABOVE_Y });
+  main.forEach((nd, i) => {
+    if (i < 3) {
+      pos.set(nd.id, { x: i * COL_X, y: ROW1_Y });
+    } else {
+      const lastX = 2 * COL_X;
+      pos.set(nd.id, { x: lastX - (i - 3) * COL_X, y: ROW2_Y });
     }
+  });
+  for (const nd of side) {
+    const e = panel.edges.find((e) => e.from === nd.id);
+    const target = e ? pos.get(e.to) : undefined;
+    pos.set(nd.id, { x: target?.x ?? 0, y: ROW2_Y });
   }
 
   const nodes: FlowNode[] = panel.nodes.map((nd) => {
-    const p = pos.get(nd.id)!;
-    const isSide = p.y !== 0;
+    const p = pos.get(nd.id) ?? { x: 0, y: 0 };
+    const size = sizeOf(nd.id);
     return {
       id: nd.id,
       type: "circleNode",
       position: p,
+      // Explicit dimensions: React Flow fits exact bounds on first paint
+      // instead of fitting against unmeasured (zero-size) custom nodes.
+      width: size,
+      height: size,
       data: {
         label: nd.label,
         shortLabel: MODEL_SHORT_LABEL[nd.id] ?? nd.label,
         blurb: nd.blurb,
-        size: sizeOf(nd.id),
-        variant: isSide ? "note" : "info",
+        size,
+        variant: isSide(nd.id) ? "note" : "info",
+        // The cost node sits under its target (not floating above it), so
+        // its caption goes below like every other node.
+        captionAbove: false,
       },
     };
   });
 
-  const edges: Edge[] = panel.edges.map((e, i) =>
-    circleEdge({
+  const edges: Edge[] = panel.edges.map((e, i) => {
+    // Side-node edges (e.g. training cost → MoE) carry no pill label: the
+    // node's own "One-time cost" eyebrow already says it, and a label would
+    // sit inside the caption band between the two rows.
+    const fromSide = isSide(e.from);
+    return circleEdge({
       id: `e-${i}`,
       source: e.from,
       target: e.to,
-      label: e.label,
-      // Attach on the sides facing each other: left/right along the chain,
-      // bottom/top for the cost node floating above its target.
+      label: fromSide ? undefined : e.label,
+      // Attach on the sides facing each other (computed from node positions).
       ...facingHandles(
         pos.get(e.from) ?? { x: 0, y: 0 },
         pos.get(e.to) ?? { x: 0, y: 0 },
       ),
-    }),
-  );
+    });
+  });
 
   return { nodes, edges };
 }
