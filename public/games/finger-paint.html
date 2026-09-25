@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+  <meta name="color-scheme" content="light dark" />
+  <link rel="icon" href="data:," />
+  <title>Finger Paint</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap');
+
+    :root {
+      color-scheme: light dark;
+      --sky: #dff3ff;
+      --sky-2: #f5fbff;
+      --ink: #17324a;
+      --muted: #526b7c;
+      --paper: #fffdf8;
+      --panel: rgba(255,255,255,.94);
+      --panel-line: rgba(35,74,100,.13);
+      --shadow: 0 12px 35px rgba(28,73,99,.14);
+      --button: #fff;
+      --button-press: #edf6fb;
+      --focus: #184f75;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --sky: #102536;
+        --sky-2: #162f43;
+        --ink: #f2f8fb;
+        --muted: #c3d1da;
+        --paper: #17222c;
+        --panel: rgba(17,34,47,.96);
+        --panel-line: rgba(224,241,250,.14);
+        --shadow: 0 12px 35px rgba(0,0,0,.28);
+        --button: #203a4d;
+        --button-press: #2b4a60;
+        --focus: #b8e5ff;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; }
+    body {
+      font-family: "Nunito", ui-rounded, system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 14% 12%, rgba(255,255,255,.75) 0 3px, transparent 4px),
+        radial-gradient(circle at 88% 19%, rgba(255,255,255,.55) 0 5px, transparent 6px),
+        linear-gradient(155deg, var(--sky-2), var(--sky));
+      background-size: 74px 74px, 118px 118px, auto;
+      overscroll-behavior: none;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    button { font: inherit; color: inherit; }
+
+    .game {
+      min-height: 100dvh;
+      height: 100dvh;
+      padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 9px;
+    }
+
+    .topline {
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 4px;
+    }
+    .prompt {
+      margin: 0;
+      font-size: clamp(17px, 3.8vw, 22px);
+      font-weight: 900;
+      letter-spacing: -.02em;
+    }
+    .prompt span { color: #ef4561; }
+    .round-button {
+      border: 1px solid var(--panel-line);
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--button);
+      box-shadow: 0 4px 12px rgba(30,70,95,.12);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+    .round-button:active { transform: translateY(1px); background: var(--button-press); }
+    .round-button:focus-visible, .tool:focus-visible, .swatch:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+    .round-button svg { width: 21px; height: 21px; }
+    .round-button .sound-off { display: none; }
+    .round-button[aria-pressed="true"] .sound-on { display: none; }
+    .round-button[aria-pressed="true"] .sound-off { display: block; }
+
+    .paper-wrap {
+      min-height: 0;
+      position: relative;
+      border: 2px solid var(--panel-line);
+      border-radius: 26px 26px 18px 18px;
+      overflow: hidden;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+      isolation: isolate;
+    }
+    #paint {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      cursor: crosshair;
+    }
+    .hint {
+      position: absolute;
+      inset: 50% auto auto 50%;
+      translate: -50% -50%;
+      text-align: center;
+      pointer-events: none;
+      color: var(--muted);
+      transition: opacity .25s ease, transform .25s ease;
+      width: min(88%, 320px);
+    }
+    .hint.hidden { opacity: 0; transform: scale(.94); }
+    .hint-hand {
+      width: 66px;
+      height: 66px;
+      margin: 0 auto 9px;
+      display: block;
+      color: #ff9f1c;
+      filter: drop-shadow(0 4px 0 rgba(178,94,0,.16));
+      animation: wiggle 2.1s ease-in-out infinite;
+    }
+    .hint strong { display: block; font-size: 20px; font-weight: 900; }
+    .hint small { display: block; margin-top: 2px; font-size: 14px; font-weight: 700; }
+    @keyframes wiggle { 0%,100% { transform: rotate(-8deg); } 50% { transform: rotate(9deg) translateY(-3px); } }
+
+    .toolbar {
+      background: var(--panel);
+      border: 1px solid var(--panel-line);
+      border-radius: 18px 18px 24px 24px;
+      padding: 9px;
+      box-shadow: 0 8px 25px rgba(28,73,99,.12);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+    }
+    .colors {
+      display: flex;
+      align-items: center;
+      justify-content: space-evenly;
+      gap: 4px;
+      min-width: 0;
+    }
+    .swatch {
+      --c: #000;
+      width: clamp(37px, 8.8vw, 48px);
+      height: clamp(37px, 8.8vw, 48px);
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,.95);
+      background: var(--c);
+      box-shadow: 0 0 0 1px rgba(18,48,68,.15), inset 0 -4px 0 rgba(0,0,0,.12);
+      cursor: pointer;
+      position: relative;
+      transition: transform .13s ease;
+      flex: 0 1 auto;
+    }
+    .swatch[aria-pressed="true"] { transform: translateY(-5px) scale(1.12); box-shadow: 0 0 0 3px var(--ink), inset 0 -4px 0 rgba(0,0,0,.12); }
+    .swatch.rainbow { background: conic-gradient(#ff3d57, #ffb000, #40c971, #2aa5ff, #7a57ff, #ff3d57); }
+    .tools { display: flex; gap: 6px; }
+    .tool {
+      height: 45px;
+      min-width: 45px;
+      padding: 0 11px;
+      border: 1px solid var(--panel-line);
+      border-radius: 13px;
+      background: var(--button);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 14px;
+      font-weight: 900;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .tool:active { transform: translateY(1px); background: var(--button-press); }
+    .tool svg { width: 20px; height: 20px; }
+    .clear-label { display: none; }
+    .clear-button.armed { background: #fff0d4; color: #704200; border-color: #f3b33b; }
+    @media (prefers-color-scheme: dark) {
+      .clear-button.armed { background: #553d18; color: #ffe3ad; }
+    }
+
+    .toast {
+      position: absolute;
+      left: 50%;
+      bottom: 16px;
+      translate: -50% 8px;
+      background: rgba(24,45,60,.88);
+      color: white;
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 800;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease, translate .18s ease;
+      z-index: 3;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; translate: -50% 0; }
+
+    @media (min-width: 720px) {
+      .game { max-width: 1060px; margin: 0 auto; padding-left: 20px; padding-right: 20px; gap: 12px; }
+      .toolbar { padding: 12px 14px; }
+      .clear-label { display: inline; }
+    }
+    @media (max-width: 440px) {
+      .game { gap: 7px; }
+      .topline { min-height: 35px; }
+      .round-button { width: 38px; height: 38px; }
+      .toolbar { grid-template-columns: 1fr; padding: 8px; }
+      .tools { position: absolute; top: max(12px, env(safe-area-inset-top)); right: calc(max(10px, env(safe-area-inset-right)) + 48px); z-index: 4; }
+      .tool { height: 38px; min-width: 38px; padding: 0 8px; border-radius: 12px; }
+      .paper-wrap { border-radius: 22px 22px 14px 14px; }
+      .swatch { width: min(11vw, 43px); height: min(11vw, 43px); }
+    }
+    @media (max-width: 340px) {
+      .swatch { width: 35px; height: 35px; border-width: 2px; }
+      .colors { gap: 2px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="game">
+    <div class="topline">
+      <p class="prompt">Pick a color. Make a <span>happy mess!</span></p>
+      <button class="round-button" id="muteButton" type="button" aria-label="Mute sounds" aria-pressed="false">
+        <svg class="sound-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6.5 9H3v6h3.5l4.5 4z"/><path d="M15 9.3a4 4 0 0 1 0 5.4M18 6.5a8 8 0 0 1 0 11"/></svg>
+        <svg class="sound-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6.5 9H3v6h3.5l4.5 4z"/><path d="m16 10 5 5m0-5-5 5"/></svg>
+      </button>
+    </div>
+
+    <section class="paper-wrap" aria-label="Finger painting canvas">
+      <canvas id="paint" role="application" tabindex="0" aria-label="Finger painting area. Drag one or more fingers to paint."></canvas>
+      <div class="hint" id="hint" aria-hidden="true">
+        <svg class="hint-hand" viewBox="0 0 72 72" fill="none" aria-hidden="true">
+          <path d="M28 37V16c0-3 2-5 5-5s5 2 5 5v16-22c0-3 2-5 5-5s5 2 5 5v23-17c0-3 2-5 5-5s5 2 5 5v25-13c0-3 2-5 5-5s5 2 5 5v22c0 13-10 23-23 23h-5c-8 0-14-3-19-9L6 45c-2-3-1-7 2-9 3-2 6-1 8 1l12 12" fill="currentColor" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <strong>Draw right here!</strong>
+        <small>One finger is all you need.</small>
+      </div>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </section>
+
+    <nav class="toolbar" aria-label="Painting tools">
+      <div class="colors" role="group" aria-label="Paint colors">
+        <button class="swatch" style="--c:#ff3b54" data-color="#ff3b54" aria-label="Red" aria-pressed="true"></button>
+        <button class="swatch" style="--c:#ffad16" data-color="#ffad16" aria-label="Yellow" aria-pressed="false"></button>
+        <button class="swatch" style="--c:#27c66f" data-color="#27c66f" aria-label="Green" aria-pressed="false"></button>
+        <button class="swatch" style="--c:#1e9eff" data-color="#1e9eff" aria-label="Blue" aria-pressed="false"></button>
+        <button class="swatch" style="--c:#8157ec" data-color="#8157ec" aria-label="Purple" aria-pressed="false"></button>
+        <button class="swatch rainbow" data-color="rainbow" aria-label="Rainbow" aria-pressed="false"></button>
+      </div>
+      <div class="tools">
+        <button class="tool clear-button" id="clearButton" type="button" aria-label="Clear painting">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 3h6l1 4H8zM7 7l1 14h8l1-14M10 11v6m4-6v6"/></svg>
+          <span class="clear-label">Clear</span>
+        </button>
+      </div>
+    </nav>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+      var canvas = document.getElementById('paint');
+      var ctx = canvas.getContext('2d', { alpha: true });
+      var wrap = canvas.parentElement;
+      var hint = document.getElementById('hint');
+      var toast = document.getElementById('toast');
+      var muteButton = document.getElementById('muteButton');
+      var clearButton = document.getElementById('clearButton');
+      var swatches = Array.prototype.slice.call(document.querySelectorAll('.swatch'));
+      var color = '#ff3b54';
+      var rainbow = false;
+      var hue = 0;
+      var drawing = new Map();
+      var hasPaint = false;
+      var clearArmed = false;
+      var clearTimer = null;
+      var toastTimer = null;
+      var audioContext = null;
+      var masterGain = null;
+      var noiseBuffer = null;
+      var muted = false;
+      var lastScribbleAt = 0;
+
+      function resizeCanvas() {
+        var rect = canvas.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        var old = document.createElement('canvas');
+        old.width = canvas.width;
+        old.height = canvas.height;
+        if (old.width && old.height) old.getContext('2d').drawImage(canvas, 0, 0);
+        var dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.round(rect.width * dpr);
+        canvas.height = Math.round(rect.height * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        if (old.width && old.height) ctx.drawImage(old, 0, 0, old.width, old.height, 0, 0, rect.width, rect.height);
+      }
+
+      function startAudio() {
+        if (!audioContext) {
+          var AudioCtor = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtor) return;
+          audioContext = new AudioCtor();
+          masterGain = audioContext.createGain();
+          masterGain.gain.value = muted ? 0 : 1;
+          masterGain.connect(audioContext.destination);
+          var length = Math.floor(audioContext.sampleRate * 0.08);
+          noiseBuffer = audioContext.createBuffer(1, length, audioContext.sampleRate);
+          var data = noiseBuffer.getChannelData(0);
+          for (var i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+        }
+        if (audioContext.state === 'suspended') audioContext.resume();
+      }
+
+      function colorTone(index) {
+        startAudio();
+        if (!audioContext || muted) return;
+        var now = audioContext.currentTime;
+        var osc = audioContext.createOscillator();
+        var gain = audioContext.createGain();
+        var frequencies = [392, 440, 494, 523, 587, 659];
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(frequencies[index] || 523, now);
+        osc.frequency.exponentialRampToValueAtTime((frequencies[index] || 523) * 1.12, now + 0.1);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.032, now + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+        osc.connect(gain); gain.connect(masterGain);
+        osc.start(now); osc.stop(now + 0.18);
+      }
+
+      function scribbleSound(speed) {
+        if (!audioContext || muted || !noiseBuffer) return;
+        var nowMs = performance.now();
+        if (nowMs - lastScribbleAt < 75) return;
+        lastScribbleAt = nowMs;
+        var now = audioContext.currentTime;
+        var source = audioContext.createBufferSource();
+        var filter = audioContext.createBiquadFilter();
+        var gain = audioContext.createGain();
+        source.buffer = noiseBuffer;
+        filter.type = 'bandpass';
+        filter.frequency.value = 650 + Math.min(speed, 30) * 18;
+        filter.Q.value = 0.7;
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.006, now + 0.008);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.055);
+        source.connect(filter); filter.connect(gain); gain.connect(masterGain);
+        source.start(now); source.stop(now + 0.065);
+      }
+
+      function pointFromEvent(event) {
+        var r = canvas.getBoundingClientRect();
+        return { x: event.clientX - r.left, y: event.clientY - r.top };
+      }
+
+      function currentColor() {
+        if (!rainbow) return color;
+        hue = (hue + 5) % 360;
+        return 'hsl(' + hue + ' 88% 56%)';
+      }
+
+      function dot(x, y, chosen, size) {
+        ctx.fillStyle = chosen;
+        ctx.beginPath();
+        ctx.arc(x, y, size / 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      function pointerDown(event) {
+        if (event.button !== undefined && event.button !== 0) return;
+        startAudio();
+        event.preventDefault();
+        canvas.setPointerCapture(event.pointerId);
+        var p = pointFromEvent(event);
+        var size = 24 + Math.min(canvas.clientWidth, canvas.clientHeight) * 0.018;
+        var chosen = currentColor();
+        drawing.set(event.pointerId, { x: p.x, y: p.y, size: size, color: chosen });
+        dot(p.x, p.y, chosen, size);
+        if (!hasPaint) {
+          hasPaint = true;
+          hint.classList.add('hidden');
+        }
+      }
+
+      function pointerMove(event) {
+        var previous = drawing.get(event.pointerId);
+        if (!previous) return;
+        event.preventDefault();
+        var p = pointFromEvent(event);
+        var dx = p.x - previous.x;
+        var dy = p.y - previous.y;
+        var speed = Math.sqrt(dx * dx + dy * dy);
+        var chosen = rainbow ? currentColor() : previous.color;
+        ctx.strokeStyle = chosen;
+        ctx.lineWidth = previous.size;
+        ctx.beginPath();
+        ctx.moveTo(previous.x, previous.y);
+        ctx.quadraticCurveTo((previous.x + p.x) / 2, (previous.y + p.y) / 2, p.x, p.y);
+        ctx.stroke();
+        drawing.set(event.pointerId, { x: p.x, y: p.y, size: previous.size, color: chosen });
+        scribbleSound(speed);
+      }
+
+      function pointerUp(event) {
+        drawing.delete(event.pointerId);
+        if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+      }
+
+      function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 1500);
+      }
+
+      swatches.forEach(function (button, index) {
+        button.addEventListener('pointerdown', startAudio, { passive: true });
+        button.addEventListener('click', function () {
+          swatches.forEach(function (s) { s.setAttribute('aria-pressed', 'false'); });
+          button.setAttribute('aria-pressed', 'true');
+          rainbow = button.dataset.color === 'rainbow';
+          if (!rainbow) color = button.dataset.color;
+          colorTone(index);
+        });
+      });
+
+      muteButton.addEventListener('click', function () {
+        startAudio();
+        muted = !muted;
+        muteButton.setAttribute('aria-pressed', String(muted));
+        muteButton.setAttribute('aria-label', muted ? 'Turn sounds on' : 'Mute sounds');
+        if (masterGain) masterGain.gain.setTargetAtTime(muted ? 0 : 1, audioContext.currentTime, 0.02);
+        showToast(muted ? 'Sounds off' : 'Sounds on');
+      });
+
+      clearButton.addEventListener('click', function () {
+        if (!hasPaint) { showToast('The page is already clean'); return; }
+        if (!clearArmed) {
+          clearArmed = true;
+          clearButton.classList.add('armed');
+          showToast('Tap again to clear');
+          clearTimer = setTimeout(function () {
+            clearArmed = false;
+            clearButton.classList.remove('armed');
+          }, 2200);
+          return;
+        }
+        clearTimeout(clearTimer);
+        clearArmed = false;
+        clearButton.classList.remove('armed');
+        ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+        hasPaint = false;
+        hint.classList.remove('hidden');
+        showToast('Fresh page!');
+      });
+
+      canvas.addEventListener('pointerdown', pointerDown);
+      canvas.addEventListener('pointermove', pointerMove);
+      canvas.addEventListener('pointerup', pointerUp);
+      canvas.addEventListener('pointercancel', pointerUp);
+      window.addEventListener('resize', resizeCanvas);
+      if (window.ResizeObserver) new ResizeObserver(resizeCanvas).observe(wrap);
+      requestAnimationFrame(resizeCanvas);
+    }());
+  </script>
+</body>
+</html>

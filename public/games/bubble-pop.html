@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="color-scheme" content="light dark" />
+  <link rel="icon" href="data:," />
+  <title>Bubble Pop</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800&display=swap');
+
+    :root {
+      color-scheme: light dark;
+      --sky-top: #e8fbff;
+      --sky-bottom: #b8e6ff;
+      --ink: #18334d;
+      --soft-ink: #43637d;
+      --panel: rgba(255, 255, 255, .78);
+      --panel-strong: rgba(255, 255, 255, .94);
+      --line: rgba(22, 88, 126, .15);
+      --shadow: 0 8px 24px rgba(37, 100, 135, .15);
+      --button: #ffffff;
+      --button-pressed: #e7f8ff;
+      --accent: #ff6d8c;
+      --focus: #126b91;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --sky-top: #102c46;
+        --sky-bottom: #17435c;
+        --ink: #f2fbff;
+        --soft-ink: #c5e5f2;
+        --panel: rgba(10, 34, 51, .78);
+        --panel-strong: rgba(15, 43, 62, .95);
+        --line: rgba(191, 235, 255, .17);
+        --shadow: 0 8px 26px rgba(0, 0, 0, .26);
+        --button: #173f59;
+        --button-pressed: #225571;
+        --accent: #ff88a1;
+        --focus: #9ee8ff;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    body {
+      font-family: "Nunito", sans-serif;
+      color: var(--ink);
+      background: linear-gradient(180deg, var(--sky-top), var(--sky-bottom));
+      overscroll-behavior: none;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .game {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 420px;
+      isolation: isolate;
+    }
+
+    .sun-glow {
+      position: absolute;
+      width: min(62vw, 620px);
+      aspect-ratio: 1;
+      left: -20vw;
+      top: -28vw;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,255,255,.72), rgba(255,255,255,0) 68%);
+      pointer-events: none;
+    }
+
+    canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+
+    .topbar {
+      position: absolute;
+      z-index: 3;
+      top: max(12px, env(safe-area-inset-top));
+      left: max(12px, env(safe-area-inset-left));
+      right: max(12px, env(safe-area-inset-right));
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      pointer-events: none;
+    }
+
+    .score {
+      min-width: 112px;
+      padding: 7px 14px 8px;
+      border: 1px solid var(--line);
+      border-radius: 18px 18px 18px 7px;
+      color: var(--ink);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+      pointer-events: auto;
+    }
+    .score-label { display: block; color: var(--soft-ink); font-size: 11px; line-height: 1; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+    .score-number { display: block; font-family: "Baloo 2", sans-serif; font-size: 28px; line-height: 1.05; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+    button { font: inherit; color: inherit; }
+    .icon-button {
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: var(--panel-strong);
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      pointer-events: auto;
+    }
+    .icon-button:active { background: var(--button-pressed); transform: translateY(1px); }
+    .icon-button:focus-visible, .big-button:focus-visible { outline: 4px solid color-mix(in srgb, var(--focus), transparent 45%); outline-offset: 3px; }
+    .icon-button svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+    .sound-off .sound-wave, .sound-on .sound-slash { display: none; }
+
+    .prompt {
+      position: absolute;
+      z-index: 3;
+      left: 50%;
+      top: 22%;
+      transform: translate(-50%, -50%);
+      width: min(86vw, 390px);
+      text-align: center;
+      pointer-events: none;
+      transition: opacity .35s ease, transform .35s ease;
+    }
+    .prompt.hidden { opacity: 0; transform: translate(-50%, -45%); }
+    .prompt h1 {
+      margin: 0;
+      font-family: "Baloo 2", sans-serif;
+      font-size: clamp(33px, 9vw, 56px);
+      line-height: .98;
+      letter-spacing: -.025em;
+      text-wrap: balance;
+      text-shadow: 0 2px 0 rgba(255,255,255,.4);
+    }
+    .prompt p { margin: 7px 0 0; color: var(--soft-ink); font-size: clamp(16px, 4vw, 21px); font-weight: 800; }
+
+    .bottom-controls {
+      position: absolute;
+      z-index: 3;
+      left: 50%;
+      bottom: max(16px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      width: min(92vw, 520px);
+      display: flex;
+      justify-content: center;
+      pointer-events: none;
+    }
+    .big-button {
+      min-height: 58px;
+      padding: 10px 24px;
+      border: 1px solid var(--line);
+      border-radius: 20px 20px 10px 20px;
+      background: var(--panel-strong);
+      box-shadow: var(--shadow);
+      font-family: "Baloo 2", sans-serif;
+      font-weight: 800;
+      font-size: 19px;
+      cursor: pointer;
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .big-button:active { transform: translateY(2px); background: var(--button-pressed); }
+    .bubble-cluster { width: 30px; height: 27px; position: relative; display: inline-block; }
+    .bubble-cluster i { position: absolute; border: 2px solid currentColor; border-radius: 50%; }
+    .bubble-cluster i:nth-child(1) { width: 18px; height: 18px; left: 2px; top: 7px; color: #ff5e83; }
+    .bubble-cluster i:nth-child(2) { width: 14px; height: 14px; right: 0; top: 0; color: #00a8cc; }
+    .bubble-cluster i:nth-child(3) { width: 9px; height: 9px; right: 2px; bottom: 0; color: #ef9b00; }
+
+    .celebration {
+      position: absolute;
+      z-index: 4;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+      opacity: 0;
+    }
+    .celebration.show { animation: cheer 1.05s ease both; }
+    .celebration span {
+      padding: 10px 24px 12px;
+      border-radius: 22px 22px 9px 22px;
+      background: var(--panel-strong);
+      box-shadow: var(--shadow);
+      font-family: "Baloo 2", sans-serif;
+      font-size: clamp(34px, 9vw, 58px);
+      font-weight: 800;
+      color: var(--accent);
+    }
+    @keyframes cheer {
+      0% { opacity: 0; transform: scale(.72) rotate(-3deg); }
+      22% { opacity: 1; transform: scale(1.06) rotate(2deg); }
+      70% { opacity: 1; transform: scale(1) rotate(0); }
+      100% { opacity: 0; transform: scale(1.08); }
+    }
+
+    @media (max-height: 560px) {
+      .prompt { top: 18%; }
+      .prompt p { display: none; }
+      .big-button { min-height: 50px; font-size: 17px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .prompt { transition: none; }
+      .celebration.show { animation-duration: .2s; }
+    }
+  </style>
+</head>
+<body>
+  <main class="game" id="game" aria-label="Bubble popping game">
+    <div class="sun-glow" aria-hidden="true"></div>
+    <canvas id="canvas" role="button" tabindex="0" aria-label="Bubble play area. Tap a bubble, or press Space to pop one."></canvas>
+
+    <div class="topbar">
+      <div class="score" aria-live="polite">
+        <span class="score-label">Bubbles</span>
+        <strong class="score-number" id="score">0</strong>
+      </div>
+      <button class="icon-button sound-on" id="soundButton" type="button" aria-label="Mute sound" title="Mute sound">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M11 5 6.5 8.5H3v7h3.5L11 19V5Z"></path>
+          <path class="sound-wave" d="M15 9a4 4 0 0 1 0 6M17.6 6.5a7.5 7.5 0 0 1 0 11"></path>
+          <path class="sound-slash" d="m4 4 16 16"></path>
+        </svg>
+      </button>
+    </div>
+
+    <section class="prompt" id="prompt" aria-hidden="true">
+      <h1>Tap the bubbles!</h1>
+      <p>Big ones, tiny ones — pop them all.</p>
+    </section>
+
+    <div class="celebration" id="celebration" aria-hidden="true"><span>Great popping!</span></div>
+
+    <div class="bottom-controls">
+      <button class="big-button" id="showerButton" type="button">
+        <span class="bubble-cluster" aria-hidden="true"><i></i><i></i><i></i></span>
+        Bubble shower
+      </button>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var canvas = document.getElementById('canvas');
+      var ctx = canvas.getContext('2d');
+      var scoreEl = document.getElementById('score');
+      var promptEl = document.getElementById('prompt');
+      var cheerEl = document.getElementById('celebration');
+      var soundButton = document.getElementById('soundButton');
+      var showerButton = document.getElementById('showerButton');
+      var game = document.getElementById('game');
+
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      var width = 0;
+      var height = 0;
+      var bubbles = [];
+      var sparkles = [];
+      var score = 0;
+      var started = false;
+      var lastTime = 0;
+      var spawnClock = 0;
+      var muted = false;
+      var audioCtx = null;
+      var masterGain = null;
+      var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      var colors = [
+        { base: '#ff5d84', edge: '#d93469', glow: '#ffd5df' },
+        { base: '#24b8e0', edge: '#087ea3', glow: '#d6f7ff' },
+        { base: '#ffb52e', edge: '#d67c00', glow: '#fff0bd' },
+        { base: '#50c878', edge: '#238b4d', glow: '#d9ffe5' },
+        { base: '#ab78e8', edge: '#7545b5', glow: '#eadbff' }
+      ];
+
+      function resize() {
+        var rect = game.getBoundingClientRect();
+        width = rect.width;
+        height = rect.height;
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+        canvas.style.width = width + 'px';
+        canvas.style.height = height + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      function rand(min, max) { return min + Math.random() * (max - min); }
+
+      function makeBubble(fromBottom) {
+        var r = rand(27, Math.min(67, Math.max(38, width * .115)));
+        var margin = r + 6;
+        return {
+          x: rand(margin, Math.max(margin + 1, width - margin)),
+          y: fromBottom ? height + r + rand(0, height * .25) : rand(100, Math.max(101, height - 95)),
+          r: r,
+          speed: rand(16, 38) * (58 / r),
+          drift: rand(-12, 12),
+          phase: rand(0, Math.PI * 2),
+          wobble: rand(.6, 1.4),
+          color: colors[Math.floor(Math.random() * colors.length)],
+          squish: rand(.94, 1.06)
+        };
+      }
+
+      function fillBubbles(count, fromBottom) {
+        for (var i = 0; i < count; i++) bubbles.push(makeBubble(fromBottom));
+      }
+
+      function setupAudio() {
+        if (!audioCtx) {
+          var AudioClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioClass) return;
+          audioCtx = new AudioClass();
+          masterGain = audioCtx.createGain();
+          masterGain.gain.value = muted ? 0 : .18;
+          masterGain.connect(audioCtx.destination);
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+      }
+
+      function playPop(radius) {
+        if (muted || !audioCtx || !masterGain) return;
+        var now = audioCtx.currentTime;
+        var sizeT = Math.max(0, Math.min(1, (radius - 27) / 40));
+        var pitch = 690 - sizeT * 310;
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        var filter = audioCtx.createBiquadFilter();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(pitch, now);
+        osc.frequency.exponentialRampToValueAtTime(Math.max(150, pitch * .48), now + .085);
+        filter.type = 'lowpass';
+        filter.frequency.value = 1200;
+        gain.gain.setValueAtTime(.0001, now);
+        gain.gain.exponentialRampToValueAtTime(.34, now + .008);
+        gain.gain.exponentialRampToValueAtTime(.0001, now + .11);
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(masterGain);
+        osc.start(now);
+        osc.stop(now + .12);
+
+        var sparkleOsc = audioCtx.createOscillator();
+        var sparkleGain = audioCtx.createGain();
+        sparkleOsc.type = 'triangle';
+        sparkleOsc.frequency.setValueAtTime(pitch * 1.65, now + .015);
+        sparkleOsc.frequency.exponentialRampToValueAtTime(pitch * 1.1, now + .075);
+        sparkleGain.gain.setValueAtTime(.0001, now);
+        sparkleGain.gain.exponentialRampToValueAtTime(.1, now + .02);
+        sparkleGain.gain.exponentialRampToValueAtTime(.0001, now + .09);
+        sparkleOsc.connect(sparkleGain);
+        sparkleGain.connect(masterGain);
+        sparkleOsc.start(now);
+        sparkleOsc.stop(now + .1);
+      }
+
+      function makeSparkles(x, y, color, radius) {
+        var amount = reduceMotion ? 5 : Math.round(7 + radius / 7);
+        for (var i = 0; i < amount; i++) {
+          var angle = (Math.PI * 2 * i / amount) + rand(-.22, .22);
+          var speed = rand(55, 115) + radius;
+          sparkles.push({
+            x: x, y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1,
+            size: rand(3, 7),
+            color: color,
+            ring: i % 3 === 0
+          });
+        }
+      }
+
+      function popAt(x, y) {
+        for (var i = bubbles.length - 1; i >= 0; i--) {
+          var b = bubbles[i];
+          var dx = x - b.x;
+          var dy = y - b.y;
+          var tapRadius = b.r + 13;
+          if (dx * dx + dy * dy <= tapRadius * tapRadius) {
+            bubbles.splice(i, 1);
+            makeSparkles(b.x, b.y, b.color.base, b.r);
+            playPop(b.r);
+            score += 1;
+            scoreEl.textContent = String(score);
+            if (!started) {
+              started = true;
+              promptEl.classList.add('hidden');
+            }
+            if (score % 10 === 0) showCheer();
+            setTimeout(function () { bubbles.push(makeBubble(true)); }, 180);
+            return true;
+          }
+        }
+        return false;
+      }
+
+      function showCheer() {
+        cheerEl.classList.remove('show');
+        void cheerEl.offsetWidth;
+        cheerEl.classList.add('show');
+      }
+
+      function pointerPosition(event) {
+        var rect = canvas.getBoundingClientRect();
+        return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      }
+
+      canvas.addEventListener('pointerdown', function (event) {
+        event.preventDefault();
+        setupAudio();
+        var p = pointerPosition(event);
+        popAt(p.x, p.y);
+      });
+
+      canvas.addEventListener('keydown', function (event) {
+        if (event.key !== ' ' && event.key !== 'Enter') return;
+        event.preventDefault();
+        setupAudio();
+        if (bubbles.length) popAt(bubbles[0].x, bubbles[0].y);
+      });
+
+      showerButton.addEventListener('pointerdown', function (event) { event.stopPropagation(); });
+      showerButton.addEventListener('click', function () {
+        setupAudio();
+        fillBubbles(8, true);
+        if (!started) {
+          started = true;
+          promptEl.classList.add('hidden');
+        }
+      });
+
+      soundButton.addEventListener('pointerdown', function (event) { event.stopPropagation(); });
+      soundButton.addEventListener('click', function () {
+        setupAudio();
+        muted = !muted;
+        if (masterGain) masterGain.gain.setTargetAtTime(muted ? 0 : .18, audioCtx.currentTime, .015);
+        soundButton.classList.toggle('sound-off', muted);
+        soundButton.classList.toggle('sound-on', !muted);
+        soundButton.setAttribute('aria-label', muted ? 'Turn sound on' : 'Mute sound');
+        soundButton.setAttribute('title', muted ? 'Turn sound on' : 'Mute sound');
+      });
+
+      function drawBubble(b) {
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.scale(1, b.squish);
+        var grad = ctx.createRadialGradient(-b.r * .32, -b.r * .38, b.r * .05, 0, 0, b.r);
+        grad.addColorStop(0, 'rgba(255,255,255,.92)');
+        grad.addColorStop(.17, b.color.glow);
+        grad.addColorStop(.55, b.color.base);
+        grad.addColorStop(1, b.color.edge);
+        ctx.globalAlpha = .88;
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, b.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = .55;
+        ctx.strokeStyle = 'rgba(255,255,255,.95)';
+        ctx.lineWidth = Math.max(2, b.r * .055);
+        ctx.beginPath();
+        ctx.arc(0, 0, b.r - 2, Math.PI * 1.05, Math.PI * 1.78);
+        ctx.stroke();
+        ctx.globalAlpha = .72;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(-b.r * .3, -b.r * .35, b.r * .15, b.r * .09, -.65, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawSparkle(s) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, s.life);
+        ctx.strokeStyle = s.color;
+        ctx.fillStyle = s.color;
+        ctx.lineWidth = 2;
+        if (s.ring) {
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.size * (1.2 - s.life * .2), 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.size * Math.max(.35, s.life), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      function update(dt) {
+        spawnClock += dt;
+        if (spawnClock > 1.45 && bubbles.length < 13) {
+          spawnClock = 0;
+          bubbles.push(makeBubble(true));
+        }
+        for (var i = bubbles.length - 1; i >= 0; i--) {
+          var b = bubbles[i];
+          b.phase += dt * b.wobble;
+          b.y -= b.speed * dt;
+          b.x += (b.drift + Math.sin(b.phase) * 11) * dt;
+          if (b.x < b.r) b.x = b.r;
+          if (b.x > width - b.r) b.x = width - b.r;
+          if (b.y < -b.r - 12) {
+            bubbles.splice(i, 1);
+            bubbles.push(makeBubble(true));
+          }
+        }
+        for (var j = sparkles.length - 1; j >= 0; j--) {
+          var s = sparkles[j];
+          s.life -= dt * 2.25;
+          s.x += s.vx * dt;
+          s.y += s.vy * dt;
+          s.vx *= .975;
+          s.vy = s.vy * .975 + 42 * dt;
+          if (s.life <= 0) sparkles.splice(j, 1);
+        }
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, width, height);
+        for (var i = 0; i < bubbles.length; i++) drawBubble(bubbles[i]);
+        for (var j = 0; j < sparkles.length; j++) drawSparkle(sparkles[j]);
+      }
+
+      function frame(now) {
+        var dt = Math.min(.034, (now - lastTime) / 1000 || .016);
+        lastTime = now;
+        update(reduceMotion ? Math.min(dt, .016) : dt);
+        draw();
+        requestAnimationFrame(frame);
+      }
+
+      window.addEventListener('resize', resize);
+      document.addEventListener('visibilitychange', function () { lastTime = performance.now(); });
+      resize();
+      fillBubbles(width < 500 ? 8 : 11, false);
+      requestAnimationFrame(frame);
+    }());
+  </script>
+</body>
+</html>
