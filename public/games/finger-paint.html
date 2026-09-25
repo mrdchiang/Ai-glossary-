@@ -1,6 +1,15 @@
 <!doctype html>
 <html lang="en">
 <head>
+<!-- pwa-tags -->
+<meta name="pwa-tags" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Paint">
+<meta name="theme-color" content="#e11d48">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
   <meta name="color-scheme" content="light dark" />
@@ -115,6 +124,14 @@
       touch-action: none;
       cursor: crosshair;
     }
+    #sparkles {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
     .hint {
       position: absolute;
       inset: 50% auto auto 50%;
@@ -171,6 +188,25 @@
       flex: 0 1 auto;
     }
     .swatch[aria-pressed="true"] { transform: translateY(-5px) scale(1.12); box-shadow: 0 0 0 3px var(--ink), inset 0 -4px 0 rgba(0,0,0,.12); }
+    .swatch.sparkle {
+      background:
+        radial-gradient(circle at 31% 28%, #fff 0 2px, transparent 3px),
+        radial-gradient(circle at 70% 37%, #fff5a8 0 2px, transparent 3px),
+        radial-gradient(circle at 49% 70%, #bffaff 0 2px, transparent 3px),
+        linear-gradient(145deg, #4f42ce, #a451dc 58%, #ee72bc);
+    }
+    .swatch.sparkle::after {
+      content: "";
+      position: absolute;
+      width: 13px;
+      height: 13px;
+      left: 50%;
+      top: 50%;
+      translate: -50% -50%;
+      background: white;
+      clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+      filter: drop-shadow(0 1px 2px rgba(49,22,99,.35));
+    }
     .swatch.rainbow { background: conic-gradient(#ff3d57, #ffb000, #40c971, #2aa5ff, #7a57ff, #ff3d57); }
     .tools { display: flex; gap: 6px; }
     .tool {
@@ -251,7 +287,8 @@
     </div>
 
     <section class="paper-wrap" aria-label="Finger painting canvas">
-      <canvas id="paint" role="application" tabindex="0" aria-label="Finger painting area. Drag one or more fingers to paint."></canvas>
+      <canvas id="paint" role="application" tabindex="0" aria-label="Finger painting area. Drag one or more fingers to paint. Press and hold to stamp a shape."></canvas>
+      <canvas id="sparkles" aria-hidden="true"></canvas>
       <div class="hint" id="hint" aria-hidden="true">
         <svg class="hint-hand" viewBox="0 0 72 72" fill="none" aria-hidden="true">
           <path d="M28 37V16c0-3 2-5 5-5s5 2 5 5v16-22c0-3 2-5 5-5s5 2 5 5v23-17c0-3 2-5 5-5s5 2 5 5v25-13c0-3 2-5 5-5s5 2 5 5v22c0 13-10 23-23 23h-5c-8 0-14-3-19-9L6 45c-2-3-1-7 2-9 3-2 6-1 8 1l12 12" fill="currentColor" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -269,6 +306,7 @@
         <button class="swatch" style="--c:#27c66f" data-color="#27c66f" aria-label="Green" aria-pressed="false"></button>
         <button class="swatch" style="--c:#1e9eff" data-color="#1e9eff" aria-label="Blue" aria-pressed="false"></button>
         <button class="swatch" style="--c:#8157ec" data-color="#8157ec" aria-label="Purple" aria-pressed="false"></button>
+        <button class="swatch sparkle" data-color="sparkle" aria-label="Sparkle" aria-pressed="false"></button>
         <button class="swatch rainbow" data-color="rainbow" aria-label="Rainbow" aria-pressed="false"></button>
       </div>
       <div class="tools">
@@ -285,6 +323,8 @@
       'use strict';
       var canvas = document.getElementById('paint');
       var ctx = canvas.getContext('2d', { alpha: true });
+      var sparkleCanvas = document.getElementById('sparkles');
+      var sparkleCtx = sparkleCanvas.getContext('2d', { alpha: true });
       var wrap = canvas.parentElement;
       var hint = document.getElementById('hint');
       var toast = document.getElementById('toast');
@@ -293,8 +333,15 @@
       var swatches = Array.prototype.slice.call(document.querySelectorAll('.swatch'));
       var color = '#ff3b54';
       var rainbow = false;
+      var sparkle = false;
       var hue = 0;
       var drawing = new Map();
+      var sparklePoints = [];
+      var sparkleFrame = null;
+      var canvasCssWidth = 0;
+      var canvasCssHeight = 0;
+      var nextStampIsHeart = false;
+      var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       var hasPaint = false;
       var clearArmed = false;
       var clearTimer = null;
@@ -312,13 +359,28 @@
         old.width = canvas.width;
         old.height = canvas.height;
         if (old.width && old.height) old.getContext('2d').drawImage(canvas, 0, 0);
+        if (canvasCssWidth && canvasCssHeight && (canvasCssWidth !== rect.width || canvasCssHeight !== rect.height)) {
+          var scaleX = rect.width / canvasCssWidth;
+          var scaleY = rect.height / canvasCssHeight;
+          sparklePoints.forEach(function (point) {
+            point.x *= scaleX;
+            point.y *= scaleY;
+            point.size *= Math.min(scaleX, scaleY);
+          });
+        }
+        canvasCssWidth = rect.width;
+        canvasCssHeight = rect.height;
         var dpr = Math.min(window.devicePixelRatio || 1, 2);
         canvas.width = Math.round(rect.width * dpr);
         canvas.height = Math.round(rect.height * dpr);
+        sparkleCanvas.width = Math.round(rect.width * dpr);
+        sparkleCanvas.height = Math.round(rect.height * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        sparkleCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         if (old.width && old.height) ctx.drawImage(old, 0, 0, old.width, old.height, 0, 0, rect.width, rect.height);
+        if (sparklePoints.length) ensureSparkleAnimation();
       }
 
       function startAudio() {
@@ -374,12 +436,137 @@
         source.start(now); source.stop(now + 0.065);
       }
 
+      function stampChime() {
+        if (!audioContext || muted) return;
+        var now = audioContext.currentTime;
+        [659, 880].forEach(function (frequency, index) {
+          var osc = audioContext.createOscillator();
+          var gain = audioContext.createGain();
+          var start = now + index * 0.075;
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(frequency, start);
+          osc.frequency.exponentialRampToValueAtTime(frequency * 1.08, start + 0.22);
+          gain.gain.setValueAtTime(0.0001, start);
+          gain.gain.exponentialRampToValueAtTime(0.045, start + 0.025);
+          gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.42);
+          osc.connect(gain); gain.connect(masterGain);
+          osc.start(start); osc.stop(start + 0.44);
+        });
+      }
+
+      function drawTwinkle(point, now) {
+        var pulse = reduceMotion ? 0.82 : 0.6 + 0.4 * Math.sin(now * point.speed + point.phase);
+        var size = point.size * (0.72 + pulse * 0.42);
+        sparkleCtx.save();
+        sparkleCtx.translate(point.x, point.y);
+        sparkleCtx.rotate(point.rotation + (reduceMotion ? 0 : now * 0.22));
+        sparkleCtx.globalAlpha = 0.48 + pulse * 0.5;
+        sparkleCtx.fillStyle = point.color;
+        sparkleCtx.beginPath();
+        sparkleCtx.moveTo(0, -size);
+        sparkleCtx.lineTo(size * 0.23, -size * 0.23);
+        sparkleCtx.lineTo(size, 0);
+        sparkleCtx.lineTo(size * 0.23, size * 0.23);
+        sparkleCtx.lineTo(0, size);
+        sparkleCtx.lineTo(-size * 0.23, size * 0.23);
+        sparkleCtx.lineTo(-size, 0);
+        sparkleCtx.lineTo(-size * 0.23, -size * 0.23);
+        sparkleCtx.closePath();
+        sparkleCtx.fill();
+        sparkleCtx.restore();
+      }
+
+      function renderSparkles(timestamp) {
+        sparkleCtx.clearRect(0, 0, canvasCssWidth, canvasCssHeight);
+        var now = timestamp / 1000;
+        sparklePoints.forEach(function (point) { drawTwinkle(point, now); });
+        if (sparklePoints.length && !reduceMotion) {
+          sparkleFrame = requestAnimationFrame(renderSparkles);
+        } else {
+          sparkleFrame = null;
+        }
+      }
+
+      function ensureSparkleAnimation() {
+        if (sparkleFrame === null) sparkleFrame = requestAnimationFrame(renderSparkles);
+      }
+
+      function addSparkles(x1, y1, x2, y2, brushSize, extra) {
+        var dx = x2 - x1;
+        var dy = y2 - y1;
+        var distance = Math.sqrt(dx * dx + dy * dy);
+        var count = Math.max(extra || 0, Math.ceil(distance / 8));
+        if (!distance && !count) count = 7;
+        var colors = ['#ffffff', '#fff2a8', '#b9fbff', '#ffd0f0'];
+        for (var i = 0; i < count; i++) {
+          var t = count === 1 ? 0.5 : i / (count - 1);
+          sparklePoints.push({
+            x: x1 + dx * t + (Math.random() - 0.5) * brushSize * 0.72,
+            y: y1 + dy * t + (Math.random() - 0.5) * brushSize * 0.72,
+            size: 2.2 + Math.random() * 4.4,
+            phase: Math.random() * Math.PI * 2,
+            speed: 2.1 + Math.random() * 2.7,
+            rotation: Math.random() * Math.PI,
+            color: colors[Math.floor(Math.random() * colors.length)]
+          });
+        }
+        if (sparklePoints.length > 700) sparklePoints.splice(0, sparklePoints.length - 700);
+        ensureSparkleAnimation();
+      }
+
+      function stampShape(x, y, entry) {
+        var size = Math.max(82, Math.min(145, Math.min(canvasCssWidth, canvasCssHeight) * 0.24));
+        var isHeart = nextStampIsHeart;
+        nextStampIsHeart = !nextStampIsHeart;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.shadowColor = 'rgba(36,38,75,.18)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 5;
+        if (entry.rainbow) {
+          var gradient = ctx.createLinearGradient(-size / 2, 0, size / 2, 0);
+          gradient.addColorStop(0, '#ff3d57');
+          gradient.addColorStop(.25, '#ffb000');
+          gradient.addColorStop(.5, '#40c971');
+          gradient.addColorStop(.75, '#2aa5ff');
+          gradient.addColorStop(1, '#8a57ef');
+          ctx.fillStyle = gradient;
+        } else {
+          ctx.fillStyle = entry.color;
+        }
+        ctx.beginPath();
+        if (isHeart) {
+          var s = size / 100;
+          ctx.moveTo(0, 38 * s);
+          ctx.bezierCurveTo(-58 * s, 4 * s, -48 * s, -40 * s, -20 * s, -42 * s);
+          ctx.bezierCurveTo(-6 * s, -43 * s, 0, -30 * s, 0, -22 * s);
+          ctx.bezierCurveTo(0, -30 * s, 6 * s, -43 * s, 20 * s, -42 * s);
+          ctx.bezierCurveTo(48 * s, -40 * s, 58 * s, 4 * s, 0, 38 * s);
+        } else {
+          var outer = size / 2;
+          var inner = outer * 0.44;
+          for (var i = 0; i < 10; i++) {
+            var radius = i % 2 === 0 ? outer : inner;
+            var angle = -Math.PI / 2 + i * Math.PI / 5;
+            var px = Math.cos(angle) * radius;
+            var py = Math.sin(angle) * radius;
+            if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+          }
+          ctx.closePath();
+        }
+        ctx.fill();
+        ctx.restore();
+        if (entry.sparkle) addSparkles(x, y, x, y, size * 0.72, 30);
+        stampChime();
+      }
+
       function pointFromEvent(event) {
         var r = canvas.getBoundingClientRect();
         return { x: event.clientX - r.left, y: event.clientY - r.top };
       }
 
       function currentColor() {
+        if (sparkle) return '#745fe6';
         if (!rainbow) return color;
         hue = (hue + 5) % 360;
         return 'hsl(' + hue + ' 88% 56%)';
@@ -400,8 +587,26 @@
         var p = pointFromEvent(event);
         var size = 24 + Math.min(canvas.clientWidth, canvas.clientHeight) * 0.018;
         var chosen = currentColor();
-        drawing.set(event.pointerId, { x: p.x, y: p.y, size: size, color: chosen });
+        var entry = {
+          x: p.x,
+          y: p.y,
+          startX: p.x,
+          startY: p.y,
+          size: size,
+          color: chosen,
+          rainbow: rainbow,
+          sparkle: sparkle,
+          moved: false,
+          holdTimer: null
+        };
+        drawing.set(event.pointerId, entry);
+        entry.holdTimer = setTimeout(function () {
+          var held = drawing.get(event.pointerId);
+          if (!held || held.moved) return;
+          stampShape(held.startX, held.startY, held);
+        }, 570);
         dot(p.x, p.y, chosen, size);
+        if (entry.sparkle) addSparkles(p.x, p.y, p.x, p.y, size, 9);
         if (!hasPaint) {
           hasPaint = true;
           hint.classList.add('hidden');
@@ -416,18 +621,36 @@
         var dx = p.x - previous.x;
         var dy = p.y - previous.y;
         var speed = Math.sqrt(dx * dx + dy * dy);
-        var chosen = rainbow ? currentColor() : previous.color;
+        var startDx = p.x - previous.startX;
+        var startDy = p.y - previous.startY;
+        if (!previous.moved && Math.sqrt(startDx * startDx + startDy * startDy) > 13) {
+          previous.moved = true;
+          clearTimeout(previous.holdTimer);
+        }
+        var chosen;
+        if (previous.rainbow) {
+          hue = (hue + 5) % 360;
+          chosen = 'hsl(' + hue + ' 88% 56%)';
+        } else {
+          chosen = previous.color;
+        }
         ctx.strokeStyle = chosen;
         ctx.lineWidth = previous.size;
         ctx.beginPath();
         ctx.moveTo(previous.x, previous.y);
         ctx.quadraticCurveTo((previous.x + p.x) / 2, (previous.y + p.y) / 2, p.x, p.y);
         ctx.stroke();
-        drawing.set(event.pointerId, { x: p.x, y: p.y, size: previous.size, color: chosen });
+        if (previous.sparkle) addSparkles(previous.x, previous.y, p.x, p.y, previous.size, 0);
+        previous.x = p.x;
+        previous.y = p.y;
+        previous.color = chosen;
+        drawing.set(event.pointerId, previous);
         scribbleSound(speed);
       }
 
       function pointerUp(event) {
+        var entry = drawing.get(event.pointerId);
+        if (entry) clearTimeout(entry.holdTimer);
         drawing.delete(event.pointerId);
         if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
       }
@@ -445,7 +668,8 @@
           swatches.forEach(function (s) { s.setAttribute('aria-pressed', 'false'); });
           button.setAttribute('aria-pressed', 'true');
           rainbow = button.dataset.color === 'rainbow';
-          if (!rainbow) color = button.dataset.color;
+          sparkle = button.dataset.color === 'sparkle';
+          if (!rainbow && !sparkle) color = button.dataset.color;
           colorTone(index);
         });
       });
@@ -475,6 +699,10 @@
         clearArmed = false;
         clearButton.classList.remove('armed');
         ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+        sparklePoints.length = 0;
+        if (sparkleFrame !== null) cancelAnimationFrame(sparkleFrame);
+        sparkleFrame = null;
+        sparkleCtx.clearRect(0, 0, canvasCssWidth, canvasCssHeight);
         hasPaint = false;
         hint.classList.remove('hidden');
         showToast('Fresh page!');
@@ -484,6 +712,7 @@
       canvas.addEventListener('pointermove', pointerMove);
       canvas.addEventListener('pointerup', pointerUp);
       canvas.addEventListener('pointercancel', pointerUp);
+      canvas.addEventListener('contextmenu', function (event) { event.preventDefault(); });
       window.addEventListener('resize', resizeCanvas);
       if (window.ResizeObserver) new ResizeObserver(resizeCanvas).observe(wrap);
       requestAnimationFrame(resizeCanvas);

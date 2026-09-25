@@ -1,6 +1,15 @@
 <!doctype html>
 <html lang="en">
 <head>
+<!-- pwa-tags -->
+<meta name="pwa-tags" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Animals">
+<meta name="theme-color" content="#16a34a">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="light dark" />
@@ -28,6 +37,7 @@
       --button-dark: #d94843;
       --focus: #174c79;
       --cloud: rgba(255,255,255,.88);
+      --confetti-shadow: rgba(23,61,73,.14);
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -47,6 +57,7 @@
         --button-dark: #d85c56;
         --focus: #ffe58f;
         --cloud: rgba(225,242,241,.62);
+        --confetti-shadow: rgba(4,24,30,.24);
       }
     }
     * { box-sizing: border-box; }
@@ -179,6 +190,8 @@
     .animal {
       --fur: #d99244;
       --fur2: #f4bb6b;
+      --shown-y: -15px;
+      --shown-scale: 1;
       position: absolute;
       z-index: 4;
       left: 50%;
@@ -190,7 +203,7 @@
       transition: transform .5s cubic-bezier(.16,1.25,.4,1), opacity .18s ease;
       filter: drop-shadow(0 10px 0 rgba(22,71,53,.18));
     }
-    .stage.open .animal { transform: translate(-50%, -15px) scale(1) rotate(0); opacity: 1; }
+    .stage.open > .animal { transform: translate(-50%, var(--shown-y)) scale(var(--shown-scale)) rotate(0); opacity: 1; }
     .body { position:absolute; left:50%; bottom:0; width:122px; height:122px; transform:translateX(-50%); border-radius:55% 55% 42% 42%; background:var(--fur); }
     .head { position:absolute; z-index:4; left:50%; top:56px; width:150px; height:142px; transform:translateX(-50%); border-radius:50% 50% 46% 46%; background:var(--fur); }
     .ear { position:absolute; z-index:1; top:47px; width:54px; height:61px; background:var(--fur); border-radius:55% 55% 43% 43%; }
@@ -275,8 +288,70 @@
 
     .spark { position:absolute; z-index:15; width:12px; height:22px; border-radius:70% 30% 70% 30%; pointer-events:none; animation:pop .8s ease-out forwards; }
     @keyframes pop { from { transform:translate(-50%,-50%) scale(.25) rotate(0); opacity:1; } to { transform:translate(var(--dx),var(--dy)) scale(1) rotate(190deg); opacity:0; } }
-    @keyframes wiggle { 0%,100%{transform:translate(-50%,-15px) rotate(0)} 35%{transform:translate(-50%,-21px) rotate(-4deg)} 70%{transform:translate(-50%,-18px) rotate(4deg)} }
-    .stage.open.celebrate .animal { animation:wiggle .52s .46s ease-in-out; }
+    @keyframes happyDance {
+      0%,100% { transform:translate(-50%,var(--shown-y)) scale(var(--shown-scale)) rotate(0); }
+      18% { transform:translate(-50%,calc(var(--shown-y) - 12px)) scale(var(--shown-scale)) rotate(-5deg); }
+      38% { transform:translate(-50%,calc(var(--shown-y) - 3px)) scale(var(--shown-scale)) rotate(5deg); }
+      58% { transform:translate(-50%,calc(var(--shown-y) - 14px)) scale(var(--shown-scale)) rotate(-4deg); }
+      78% { transform:translate(-50%,calc(var(--shown-y) - 4px)) scale(var(--shown-scale)) rotate(4deg); }
+    }
+    .stage.open.celebrate > .animal { animation:happyDance .86s .08s ease-in-out; }
+
+    .parade {
+      position:absolute;
+      z-index:16;
+      left:2%;
+      right:2%;
+      bottom:5%;
+      height:205px;
+      display:flex;
+      align-items:flex-end;
+      justify-content:center;
+      pointer-events:none;
+      opacity:0;
+      visibility:hidden;
+      transition:opacity .16s ease;
+    }
+    .parade.show { opacity:1; visibility:visible; }
+    .parade-slot { position:relative; width:14.285%; height:100%; }
+    .parade .parade-friend.animal {
+      --parade-scale:.255;
+      z-index:1;
+      left:50%;
+      bottom:0;
+      opacity:0;
+      transform-origin:bottom center;
+      transform:translateX(-50%) translateY(96px) scale(var(--parade-scale));
+      filter:drop-shadow(0 20px 0 var(--confetti-shadow));
+      transition:none;
+    }
+    .parade.show .parade-friend.animal {
+      animation:paradePop 1.55s var(--delay) cubic-bezier(.18,.88,.28,1.2) both;
+    }
+    @keyframes paradePop {
+      0% { opacity:0; transform:translateX(-50%) translateY(96px) scale(var(--parade-scale)) rotate(-7deg); }
+      22% { opacity:1; transform:translateX(-50%) translateY(0) scale(var(--parade-scale)) rotate(4deg); }
+      42% { transform:translateX(-50%) translateY(-18px) scale(var(--parade-scale)) rotate(-5deg); }
+      62% { transform:translateX(-50%) translateY(0) scale(var(--parade-scale)) rotate(5deg); }
+      82% { opacity:1; transform:translateX(-50%) translateY(-10px) scale(var(--parade-scale)) rotate(-3deg); }
+      100% { opacity:0; transform:translateX(-50%) translateY(70px) scale(var(--parade-scale)) rotate(3deg); }
+    }
+    .stage.parade-time > .animal { opacity:.14; transform:translate(-50%,calc(var(--shown-y) + 16px)) scale(var(--shown-scale)); }
+    .confetti {
+      position:absolute;
+      z-index:19;
+      top:2%;
+      width:12px;
+      height:19px;
+      border-radius:4px;
+      pointer-events:none;
+      animation:confettiFall 1.6s var(--delay) cubic-bezier(.12,.6,.28,1) forwards;
+    }
+    @keyframes confettiFall {
+      0% { opacity:0; transform:translate(0,-28px) rotate(0); }
+      12% { opacity:1; }
+      100% { opacity:0; transform:translate(var(--drift),var(--fall)) rotate(var(--spin)); }
+    }
 
     .footer-note { position:relative; z-index:20; text-align:center; padding:7px 18px max(14px, env(safe-area-inset-bottom)); font-size:.84rem; color:var(--ink-soft); }
 
@@ -294,12 +369,16 @@
       .stage.open .bush-half.left { transform:translateX(-45px) rotate(-9deg); }
       .stage.open .bush-half.right { transform:translateX(45px) rotate(9deg); }
       .message { top:3%; }
+      .parade { left:0; right:0; height:190px; bottom:4%; }
+      .parade .parade-friend.animal { --parade-scale:.205; }
     }
     @media (max-height: 640px) {
       .topbar { padding-top:10px; }
       .stage { height:475px; min-height:390px; }
-      .animal { bottom:12%; transform:translate(-50%,72px) scale(.72); }
-      .stage.open .animal { transform:translate(-50%,0) scale(.86); }
+      .animal { --shown-y:0px; --shown-scale:.86; bottom:12%; transform:translate(-50%,72px) scale(.72); }
+      .stage.open > .animal { transform:translate(-50%,var(--shown-y)) scale(var(--shown-scale)); }
+      .parade { bottom:0; height:170px; }
+      .parade .parade-friend.animal { --parade-scale:.2; bottom:0; }
       .bush { bottom:1%; transform:translateX(-50%) scale(.82); transform-origin:bottom center; }
       .tap-badge { bottom:4%; }
       .footer-note { display:none; }
@@ -337,6 +416,7 @@
           <div class="cheek left"></div><div class="cheek right"></div>
           <div class="detail trunk"></div><div class="detail whiskers"></div>
         </div>
+        <div class="parade" id="parade" aria-hidden="true"></div>
         <div class="bush" aria-hidden="true">
           <div class="bush-half left"><i class="leaf"></i><i class="leaf"></i><i class="leaf"></i><i class="leaf"></i><i class="leaf"></i></div>
           <div class="bush-half right"><i class="leaf"></i><i class="leaf"></i><i class="leaf"></i><i class="leaf"></i><i class="leaf"></i></div>
@@ -359,15 +439,28 @@
         { kind: 'cat', name: 'Kitty', pitch: 510, sound: 'chirp' }
       ];
       var index = -1;
+      var revealCount = 0;
       var busy = false;
       var muted = false;
       var audioContext = null;
       var stage = document.getElementById('stage');
       var animal = document.getElementById('animal');
+      var parade = document.getElementById('parade');
       var message = document.getElementById('message');
       var soundButton = document.getElementById('soundButton');
       var tapBadge = document.getElementById('tapBadge');
       var colors = ['#ffd54f','#ff7b72','#67d8ee','#ff9ac2','#f5f2de','#8be06d'];
+
+      friends.forEach(function (friend, friendIndex) {
+        var slot = document.createElement('div');
+        var paradeFriend = animal.cloneNode(true);
+        slot.className = 'parade-slot';
+        paradeFriend.removeAttribute('id');
+        paradeFriend.className = 'animal parade-friend ' + friend.kind;
+        paradeFriend.style.setProperty('--delay', (friendIndex * .075) + 's');
+        slot.appendChild(paradeFriend);
+        parade.appendChild(slot);
+      });
 
       function getAudio() {
         if (!audioContext) {
@@ -412,6 +505,17 @@
         }
       }
 
+      function playParade() {
+        if (muted) return;
+        var ctx = getAudio();
+        if (!ctx) return;
+        var now = ctx.currentTime + .02;
+        [294, 370, 440, 587].forEach(function (pitch, noteIndex) {
+          tone(ctx, 'sine', pitch, pitch * 1.04, now + noteIndex * .13, .22, .027);
+          tone(ctx, 'triangle', pitch * 2, pitch * 1.9, now + noteIndex * .13, .18, .009);
+        });
+      }
+
       function sprinkle() {
         var rect = stage.getBoundingClientRect();
         for (var i = 0; i < 12; i++) {
@@ -428,14 +532,33 @@
         }
       }
 
+      function confettiBurst() {
+        var rect = stage.getBoundingClientRect();
+        for (var i = 0; i < 42; i++) {
+          var piece = document.createElement('i');
+          piece.className = 'confetti';
+          piece.style.left = (5 + Math.random() * 90) + '%';
+          piece.style.background = colors[i % colors.length];
+          piece.style.setProperty('--delay', (Math.random() * .28) + 's');
+          piece.style.setProperty('--drift', ((Math.random() - .5) * Math.min(rect.width * .34, 160)) + 'px');
+          piece.style.setProperty('--fall', (rect.height * (.56 + Math.random() * .3)) + 'px');
+          piece.style.setProperty('--spin', ((Math.random() > .5 ? 1 : -1) * (320 + Math.random() * 520)) + 'deg');
+          stage.appendChild(piece);
+          window.setTimeout((function (node) { return function () { node.remove(); }; })(piece), 2100);
+        }
+      }
+
       function showNext() {
         if (busy) return;
         busy = true;
-        stage.classList.remove('open', 'celebrate');
+        stage.classList.remove('open', 'celebrate', 'parade-time');
+        parade.classList.remove('show');
         tapBadge.textContent = 'Tap for peekaboo!';
         window.setTimeout(function () {
           index = (index + 1) % friends.length;
+          revealCount += 1;
           var friend = friends[index];
+          var isParadeReveal = revealCount % 3 === 0;
           animal.className = 'animal ' + friend.kind;
           message.textContent = 'Hello, ' + friend.name + '!';
           stage.setAttribute('aria-label', friend.name + ' says hello. Tap for another animal');
@@ -443,7 +566,27 @@
           tapBadge.textContent = 'Another friend!';
           playFriend(friend);
           sprinkle();
-          busy = false;
+
+          if (isParadeReveal) {
+            window.setTimeout(function () {
+              stage.classList.remove('celebrate');
+              stage.classList.add('parade-time');
+              parade.classList.add('show');
+              message.textContent = 'Everybody dance!';
+              stage.setAttribute('aria-label', 'All the animal friends are dancing');
+              confettiBurst();
+              playParade();
+            }, 980);
+            window.setTimeout(function () {
+              parade.classList.remove('show');
+              stage.classList.remove('parade-time');
+              message.textContent = 'Hello, ' + friend.name + '!';
+              stage.setAttribute('aria-label', friend.name + ' says hello. Tap for another animal');
+              busy = false;
+            }, 2750);
+          } else {
+            window.setTimeout(function () { busy = false; }, 880);
+          }
         }, index < 0 ? 70 : 360);
       }
 

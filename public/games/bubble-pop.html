@@ -1,6 +1,15 @@
 <!doctype html>
 <html lang="en">
 <head>
+<!-- pwa-tags -->
+<meta name="pwa-tags" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bubbles">
+<meta name="theme-color" content="#2563eb">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
   <meta name="color-scheme" content="light dark" />
@@ -258,6 +267,7 @@
       var scoreEl = document.getElementById('score');
       var promptEl = document.getElementById('prompt');
       var cheerEl = document.getElementById('celebration');
+      var cheerMessage = cheerEl.querySelector('span');
       var soundButton = document.getElementById('soundButton');
       var showerButton = document.getElementById('showerButton');
       var game = document.getElementById('game');
@@ -271,6 +281,9 @@
       var started = false;
       var lastTime = 0;
       var spawnClock = 0;
+      var goldenClock = 0;
+      var nextGolden = rand(8, 14);
+      var partyClock = 0;
       var muted = false;
       var audioCtx = null;
       var masterGain = null;
@@ -298,24 +311,31 @@
 
       function rand(min, max) { return min + Math.random() * (max - min); }
 
-      function makeBubble(fromBottom) {
-        var r = rand(27, Math.min(67, Math.max(38, width * .115)));
+      function makeBubble(fromBottom, golden, party) {
+        var r = golden ? rand(46, 62) : rand(27, Math.min(67, Math.max(38, width * .115)));
         var margin = r + 6;
         return {
           x: rand(margin, Math.max(margin + 1, width - margin)),
           y: fromBottom ? height + r + rand(0, height * .25) : rand(100, Math.max(101, height - 95)),
           r: r,
-          speed: rand(16, 38) * (58 / r),
-          drift: rand(-12, 12),
+          speed: golden ? rand(14, 20) : rand(16, 38) * (58 / r),
+          drift: golden ? rand(-18, 18) : rand(-12, 12),
           phase: rand(0, Math.PI * 2),
-          wobble: rand(.6, 1.4),
-          color: colors[Math.floor(Math.random() * colors.length)],
-          squish: rand(.94, 1.06)
+          wobble: golden ? rand(1.15, 1.65) : rand(.6, 1.4),
+          color: golden ? { base: '#ffd52f', edge: '#e68a00', glow: '#fff9bd' } : colors[Math.floor(Math.random() * colors.length)],
+          squish: rand(.94, 1.06),
+          golden: !!golden,
+          party: !!party
         };
       }
 
-      function fillBubbles(count, fromBottom) {
-        for (var i = 0; i < count; i++) bubbles.push(makeBubble(fromBottom));
+      function fillBubbles(count, fromBottom, party) {
+        for (var i = 0; i < count; i++) bubbles.push(makeBubble(fromBottom, false, party));
+      }
+
+      function hasGoldenBubble() {
+        for (var i = 0; i < bubbles.length; i++) if (bubbles[i].golden) return true;
+        return false;
       }
 
       function setupAudio() {
@@ -366,6 +386,26 @@
         sparkleOsc.stop(now + .1);
       }
 
+      function playFanfare() {
+        if (muted || !audioCtx || !masterGain) return;
+        var now = audioCtx.currentTime;
+        var notes = [523.25, 659.25, 783.99, 1046.5];
+        for (var i = 0; i < notes.length; i++) {
+          var start = now + i * .105;
+          var osc = audioCtx.createOscillator();
+          var gain = audioCtx.createGain();
+          osc.type = i === notes.length - 1 ? 'sine' : 'triangle';
+          osc.frequency.setValueAtTime(notes[i], start);
+          gain.gain.setValueAtTime(.0001, start);
+          gain.gain.exponentialRampToValueAtTime(i === notes.length - 1 ? .22 : .15, start + .018);
+          gain.gain.exponentialRampToValueAtTime(.0001, start + (i === notes.length - 1 ? .48 : .24));
+          osc.connect(gain);
+          gain.connect(masterGain);
+          osc.start(start);
+          osc.stop(start + (i === notes.length - 1 ? .5 : .26));
+        }
+      }
+
       function makeSparkles(x, y, color, radius) {
         var amount = reduceMotion ? 5 : Math.round(7 + radius / 7);
         for (var i = 0; i < amount; i++) {
@@ -381,6 +421,19 @@
             ring: i % 3 === 0
           });
         }
+      }
+
+      function startBubbleParty(x, y) {
+        partyClock = reduceMotion ? 1.2 : 3.2;
+        fillBubbles(width < 500 ? 18 : 26, false, true);
+        makeSparkles(x, y, '#ffd52f', 96);
+        var bursts = reduceMotion ? 5 : 15;
+        for (var i = 0; i < bursts; i++) {
+          var color = colors[i % colors.length].base;
+          makeSparkles(rand(22, Math.max(23, width - 22)), rand(80, Math.max(81, height - 60)), color, rand(28, 54));
+        }
+        playFanfare();
+        showCheer('Bubble party!');
       }
 
       function popAt(x, y) {
@@ -399,15 +452,23 @@
               started = true;
               promptEl.classList.add('hidden');
             }
-            if (score % 10 === 0) showCheer();
-            setTimeout(function () { bubbles.push(makeBubble(true)); }, 180);
+            if (b.golden) {
+              nextGolden = rand(20, 34);
+              goldenClock = 0;
+              startBubbleParty(b.x, b.y);
+              if (score % 10 === 0) setTimeout(function () { showCheer('Great popping!'); }, 1100);
+            } else {
+              if (score % 10 === 0) showCheer('Great popping!');
+              if (!b.party) setTimeout(function () { bubbles.push(makeBubble(true, false, false)); }, 180);
+            }
             return true;
           }
         }
         return false;
       }
 
-      function showCheer() {
+      function showCheer(message) {
+        cheerMessage.textContent = message || 'Great popping!';
         cheerEl.classList.remove('show');
         void cheerEl.offsetWidth;
         cheerEl.classList.add('show');
@@ -478,6 +539,30 @@
         ctx.beginPath();
         ctx.ellipse(-b.r * .3, -b.r * .35, b.r * .15, b.r * .09, -.65, 0, Math.PI * 2);
         ctx.fill();
+        if (b.golden) {
+          ctx.globalAlpha = .92;
+          ctx.strokeStyle = '#fff7a3';
+          ctx.lineWidth = 3;
+          ctx.setLineDash([5, 8]);
+          ctx.lineDashOffset = b.phase * 9;
+          ctx.beginPath();
+          ctx.arc(0, 0, b.r + 7, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = '#fffbe0';
+          ctx.shadowColor = '#ffffff';
+          ctx.shadowBlur = 8;
+          ctx.beginPath();
+          for (var p = 0; p < 8; p++) {
+            var a = -Math.PI / 2 + p * Math.PI / 4;
+            var sr = p % 2 === 0 ? b.r * .31 : b.r * .13;
+            var sx = Math.cos(a) * sr;
+            var sy = Math.sin(a) * sr;
+            if (p === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+          }
+          ctx.closePath();
+          ctx.fill();
+        }
         ctx.restore();
       }
 
@@ -501,9 +586,20 @@
 
       function update(dt) {
         spawnClock += dt;
+        goldenClock += dt;
         if (spawnClock > 1.45 && bubbles.length < 13) {
           spawnClock = 0;
-          bubbles.push(makeBubble(true));
+          bubbles.push(makeBubble(true, false));
+        }
+        if (goldenClock > nextGolden && !hasGoldenBubble()) {
+          goldenClock = 0;
+          bubbles.push(makeBubble(true, true));
+        }
+        if (partyClock > 0) {
+          partyClock -= dt;
+          if (!reduceMotion && Math.random() < dt * 8) {
+            makeSparkles(rand(18, Math.max(19, width - 18)), rand(72, Math.max(73, height - 48)), '#ffd52f', 18);
+          }
         }
         for (var i = bubbles.length - 1; i >= 0; i--) {
           var b = bubbles[i];
@@ -514,7 +610,12 @@
           if (b.x > width - b.r) b.x = width - b.r;
           if (b.y < -b.r - 12) {
             bubbles.splice(i, 1);
-            bubbles.push(makeBubble(true));
+            if (b.golden) {
+              goldenClock = 0;
+              nextGolden = rand(18, 30);
+            } else if (!b.party) {
+              bubbles.push(makeBubble(true, false, false));
+            }
           }
         }
         for (var j = sparkles.length - 1; j >= 0; j--) {

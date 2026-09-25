@@ -1,6 +1,15 @@
 <!doctype html>
 <html lang="en">
 <head>
+<!-- pwa-tags -->
+<meta name="pwa-tags" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Galaxy">
+<meta name="theme-color" content="#6d28d9">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
   <meta name="color-scheme" content="light dark" />
@@ -168,7 +177,9 @@
     button:active { background: var(--button-pressed); transform: translateY(1px); }
     button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
     button svg { width: 25px; height: 25px; display: block; overflow: visible; }
-    #tempo[aria-pressed="true"] { background: var(--button-pressed); }
+    #tempo[aria-pressed="true"], #sound[aria-pressed="true"] { background: var(--button-pressed); }
+    #sound[aria-pressed="true"] .sound-wave { display: none; }
+    #sound[aria-pressed="true"] .sound-muted { display: block !important; }
     @media (max-width: 520px) {
       .hint { top: max(84px, calc(env(safe-area-inset-top) + 78px)); }
     }
@@ -193,7 +204,7 @@
 </head>
 <body>
   <main aria-label="Star Catcher game in an interactive particle galaxy.">
-    <canvas id="galaxy" tabindex="0" role="application" aria-label="Star Catcher canvas. Tap the large flying stars to catch them. Drag to swirl the galaxy. Press Space to catch a flying star."></canvas>
+    <canvas id="galaxy" tabindex="0" role="application" aria-label="Star Catcher canvas. Tap large flying stars to catch them. Tap empty space for a supernova. Double tap or swipe quickly to launch a comet. Drag to swirl the galaxy. Press Space to catch a flying star."></canvas>
 
     <div class="game-hud" id="gameHud" role="status" aria-label="0 stars caught">
       <svg viewBox="0 0 32 32" aria-hidden="true"><path d="m16 2.8 3.9 8 8.8 1.3-6.4 6.2 1.5 8.8-7.8-4.2-7.8 4.2 1.5-8.8-6.4-6.2 8.8-1.3z" fill="currentColor" stroke="#fff6be" stroke-width="1.3" stroke-linejoin="round"/></svg>
@@ -217,6 +228,14 @@
           <path d="M15.4 2.8 6.7 15.1h6.5l-1 10.1 9.1-13.6h-6.5z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
         </svg>
         <span>Turbo</span>
+      </button>
+      <button id="sound" type="button" aria-label="Mute sounds" aria-pressed="false">
+        <svg viewBox="0 0 28 28" aria-hidden="true">
+          <path d="M5 11h4l5-4.2v14.4L9 17H5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+          <path class="sound-wave" d="M18 10.2a5.4 5.4 0 0 1 0 7.6M21 7.3a9.4 9.4 0 0 1 0 13.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path class="sound-muted" d="m18.2 11.2 5.6 5.6m0-5.6-5.6 5.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none"/>
+        </svg>
+        <span>Sound</span>
       </button>
       <button id="reset" type="button" aria-label="Reset Star Catcher game">
         <svg viewBox="0 0 28 28" aria-hidden="true">
@@ -242,6 +261,7 @@
       var celebrationNode = document.getElementById('celebration');
       var colorButton = document.getElementById('color');
       var tempoButton = document.getElementById('tempo');
+      var soundButton = document.getElementById('sound');
       var resetButton = document.getElementById('reset');
       var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       var darkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -256,6 +276,7 @@
       var bursts = [];
       var trails = [];
       var shootingStars = [];
+      var comets = [];
       var pointers = new Map();
       var W = 0, H = 0, dpr = 1, cx = 0, cy = 0, galaxyRadius = 1;
       var lastTime = performance.now();
@@ -265,6 +286,193 @@
       var starsCaught = 0;
       var spawnClock = 0;
       var starId = 0;
+      var audioContext = null;
+      var masterGain = null;
+      var ambientGain = null;
+      var noiseBuffer = null;
+      var muted = false;
+      var lastTwinkleAt = 0;
+      var lastWhooshAt = 0;
+      var lastTapAt = 0;
+      var lastTapX = 0;
+      var lastTapY = 0;
+
+      function makeNoiseBuffer() {
+        if (!audioContext || noiseBuffer) return noiseBuffer;
+        var length = Math.floor(audioContext.sampleRate * 1.5);
+        noiseBuffer = audioContext.createBuffer(1, length, audioContext.sampleRate);
+        var channel = noiseBuffer.getChannelData(0);
+        var smooth = 0;
+        for (var i = 0; i < length; i++) {
+          smooth = smooth * .82 + (Math.random() * 2 - 1) * .18;
+          channel[i] = smooth;
+        }
+        return noiseBuffer;
+      }
+
+      function ensureAudio() {
+        if (muted) return false;
+        if (!audioContext) {
+          var AudioEngine = window.AudioContext || window.webkitAudioContext;
+          if (!AudioEngine) return false;
+          audioContext = new AudioEngine();
+          masterGain = audioContext.createGain();
+          masterGain.gain.value = .42;
+          masterGain.connect(audioContext.destination);
+
+          ambientGain = audioContext.createGain();
+          ambientGain.gain.value = .015;
+          var ambientFilter = audioContext.createBiquadFilter();
+          ambientFilter.type = 'lowpass';
+          ambientFilter.frequency.value = 420;
+          ambientFilter.Q.value = .7;
+          ambientGain.connect(ambientFilter);
+          ambientFilter.connect(masterGain);
+
+          var low = audioContext.createOscillator();
+          var high = audioContext.createOscillator();
+          low.type = 'sine';
+          high.type = 'triangle';
+          low.frequency.value = 55;
+          high.frequency.value = 82.5;
+          low.detune.value = -4;
+          high.detune.value = 5;
+          low.connect(ambientGain);
+          high.connect(ambientGain);
+          low.start();
+          high.start();
+
+          var air = audioContext.createBufferSource();
+          var airFilter = audioContext.createBiquadFilter();
+          var airGain = audioContext.createGain();
+          air.buffer = makeNoiseBuffer();
+          air.loop = true;
+          airFilter.type = 'bandpass';
+          airFilter.frequency.value = 680;
+          airFilter.Q.value = .45;
+          airGain.gain.value = .012;
+          air.connect(airFilter);
+          airFilter.connect(airGain);
+          airGain.connect(ambientGain);
+          air.start();
+        }
+        if (audioContext.state === 'suspended') audioContext.resume();
+        return true;
+      }
+
+      function tone(frequency, start, duration, volume, type, glideTo) {
+        if (!ensureAudio()) return;
+        var now = audioContext.currentTime;
+        var when = now + (start || 0);
+        var oscillator = audioContext.createOscillator();
+        var gain = audioContext.createGain();
+        oscillator.type = type || 'sine';
+        oscillator.frequency.setValueAtTime(frequency, when);
+        if (glideTo) oscillator.frequency.exponentialRampToValueAtTime(glideTo, when + duration);
+        gain.gain.setValueAtTime(.0001, when);
+        gain.gain.exponentialRampToValueAtTime(Math.max(.0002, volume), when + Math.min(.035, duration * .18));
+        gain.gain.exponentialRampToValueAtTime(.0001, when + duration);
+        oscillator.connect(gain);
+        gain.connect(masterGain);
+        oscillator.start(when);
+        oscillator.stop(when + duration + .04);
+      }
+
+      function playTwinkle(x, y) {
+        if (!ensureAudio()) return;
+        var now = performance.now();
+        if (now - lastTwinkleAt < 115) return;
+        lastTwinkleAt = now;
+        var notes = [523.25, 587.33, 659.25, 783.99, 880];
+        var xIndex = Math.floor(Math.max(0, Math.min(.999, x / Math.max(1, W))) * notes.length);
+        var octaveLift = y < H * .38 ? 1.5 : 1;
+        var note = notes[xIndex] * octaveLift;
+        tone(note, 0, .36, .045, 'sine');
+        tone(note * 2, .018, .24, .018, 'sine');
+      }
+
+      function playWhoosh(strength) {
+        if (!ensureAudio()) return;
+        var stamp = performance.now();
+        if (stamp - lastWhooshAt < 170) return;
+        lastWhooshAt = stamp;
+        var now = audioContext.currentTime;
+        var source = audioContext.createBufferSource();
+        var filter = audioContext.createBiquadFilter();
+        var gain = audioContext.createGain();
+        source.buffer = makeNoiseBuffer();
+        filter.type = 'bandpass';
+        filter.Q.value = .75;
+        filter.frequency.setValueAtTime(270, now);
+        filter.frequency.exponentialRampToValueAtTime(560 + Math.min(2.2, strength) * 180, now + .28);
+        gain.gain.setValueAtTime(.0001, now);
+        gain.gain.exponentialRampToValueAtTime(.016 + Math.min(2.2, strength) * .006, now + .045);
+        gain.gain.exponentialRampToValueAtTime(.0001, now + .34);
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(masterGain);
+        source.start(now);
+        source.stop(now + .36);
+      }
+
+      function playCometWhoosh() {
+        if (!ensureAudio()) return;
+        var now = audioContext.currentTime;
+        var source = audioContext.createBufferSource();
+        var filter = audioContext.createBiquadFilter();
+        var gain = audioContext.createGain();
+        source.buffer = makeNoiseBuffer();
+        filter.type = 'bandpass';
+        filter.Q.value = .6;
+        filter.frequency.setValueAtTime(340, now);
+        filter.frequency.exponentialRampToValueAtTime(1250, now + .22);
+        filter.frequency.exponentialRampToValueAtTime(420, now + .82);
+        gain.gain.setValueAtTime(.0001, now);
+        gain.gain.exponentialRampToValueAtTime(.043, now + .08);
+        gain.gain.exponentialRampToValueAtTime(.0001, now + .9);
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(masterGain);
+        source.start(now);
+        source.stop(now + .92);
+        tone(330, 0, .78, .014, 'sine', 660);
+      }
+
+      function playBloom() {
+        if (!ensureAudio()) return;
+        tone(92.5, 0, .86, .052, 'sine', 138.6);
+        tone(185, .04, .68, .021, 'sine', 277.2);
+        tone(369.99, .16, .55, .012, 'sine');
+      }
+
+      function playCatchDing() {
+        if (!ensureAudio()) return;
+        var step = Math.min(4, Math.max(0, (starsCaught - 1) % 5));
+        var note = 659.25 * Math.pow(2, step * 2 / 12);
+        tone(note, 0, .44, .065, 'sine');
+        tone(note * 1.5, .055, .34, .027, 'sine');
+      }
+
+      function playCelebration() {
+        if (!ensureAudio()) return;
+        var notes = [523.25, 659.25, 783.99, 987.77, 1046.5];
+        for (var i = 0; i < notes.length; i++) {
+          tone(notes[i], i * .105, .42, .042, 'sine');
+        }
+      }
+
+      function setMuted(nextMuted) {
+        muted = nextMuted;
+        soundButton.setAttribute('aria-pressed', String(muted));
+        soundButton.setAttribute('aria-label', muted ? 'Turn sounds on' : 'Mute sounds');
+        soundButton.querySelector('span').textContent = muted ? 'Muted' : 'Sound';
+        if (audioContext && masterGain) {
+          var now = audioContext.currentTime;
+          masterGain.gain.cancelScheduledValues(now);
+          masterGain.gain.setValueAtTime(Math.max(.0001, masterGain.gain.value), now);
+          masterGain.gain.exponentialRampToValueAtTime(muted ? .0001 : .42, now + .08);
+        }
+      }
 
       function randomNormal() {
         return (Math.random() + Math.random() + Math.random() + Math.random() - 2) / 2;
@@ -325,7 +533,35 @@
         spawnClock = delay === undefined ? Math.max(.85, 2.05 - starsCaught * .035) : delay;
       }
 
+      function launchComet(x, y, dx, dy) {
+        var length = Math.sqrt(dx * dx + dy * dy);
+        if (length < 1) {
+          var angle = Math.random() * .8 - .4 + (Math.random() > .5 ? 0 : Math.PI);
+          dx = Math.cos(angle);
+          dy = Math.sin(angle);
+          length = 1;
+        }
+        var ux = dx / length, uy = dy / length;
+        var travel = Math.sqrt(W * W + H * H) + 360;
+        var speed = reducedMotion ? 430 : 760;
+        comets.push({
+          x: x - ux * 90,
+          y: y - uy * 90,
+          ux: ux,
+          uy: uy,
+          speed: speed,
+          remaining: travel / speed,
+          tail: [],
+          hue: Math.random() > .42 ? 188 : 48,
+          sparkleClock: 0
+        });
+        if (comets.length > 4) comets.shift();
+        playCometWhoosh();
+        status.textContent = 'Comet!';
+      }
+
       function celebrateMilestone() {
+        playCelebration();
         celebrationNode.classList.remove('is-showing');
         void celebrationNode.offsetWidth;
         celebrationNode.classList.add('is-showing');
@@ -355,6 +591,7 @@
         var caught = shootingStars.splice(best, 1)[0];
         starsCaught++;
         updateHud();
+        playCatchDing();
         supernova(caught.x, caught.y, .74);
         for (var j = 0; j < 16; j++) {
           var a = Math.random() * Math.PI * 2;
@@ -375,6 +612,7 @@
         bursts = [];
         trails = [];
         shootingStars = [];
+        comets = [];
         spawnShootingStar(.55);
       }
 
@@ -492,6 +730,32 @@
             spawnClock = Math.min(spawnClock, .38);
           }
         }
+        for (var c = comets.length - 1; c >= 0; c--) {
+          var comet = comets[c];
+          comet.x += comet.ux * comet.speed * dt;
+          comet.y += comet.uy * comet.speed * dt;
+          comet.remaining -= dt;
+          comet.tail.unshift({ x: comet.x, y: comet.y });
+          if (comet.tail.length > (reducedMotion ? 15 : 34)) comet.tail.pop();
+          comet.sparkleClock -= dt;
+          if (comet.sparkleClock <= 0 && comet.x > -30 && comet.x < W + 30 && comet.y > -30 && comet.y < H + 30) {
+            comet.sparkleClock = reducedMotion ? .09 : .028;
+            for (var q = 0; q < (reducedMotion ? 1 : 2); q++) {
+              var side = (Math.random() - .5) * 28;
+              var back = 8 + Math.random() * 34;
+              trails.push({
+                x: comet.x - comet.ux * back - comet.uy * side,
+                y: comet.y - comet.uy * back + comet.ux * side,
+                vx: -comet.ux * (.4 + Math.random() * 1.2) - comet.uy * side * .025,
+                vy: -comet.uy * (.4 + Math.random() * 1.2) + comet.ux * side * .025,
+                life: .7 + Math.random() * .3,
+                hue: q ? palettes[paletteIndex].a : comet.hue,
+                size: 1.5 + Math.random() * 3.5
+              });
+            }
+          }
+          if (comet.remaining <= 0) comets.splice(c, 1);
+        }
         for (var b = bursts.length - 1; b >= 0; b--) {
           bursts[b].life -= dt * .72;
           if (bursts[b].life <= 0) bursts.splice(b, 1);
@@ -518,6 +782,46 @@
           if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
         }
         ctx.closePath();
+      }
+
+      function drawComets() {
+        for (var i = 0; i < comets.length; i++) {
+          var comet = comets[i];
+          if (comet.tail.length > 1) {
+            var oldest = comet.tail[comet.tail.length - 1];
+            var glowTail = ctx.createLinearGradient(oldest.x, oldest.y, comet.x, comet.y);
+            glowTail.addColorStop(0, 'hsla(' + comet.hue + ',100%,68%,0)');
+            glowTail.addColorStop(.46, 'hsla(' + comet.hue + ',100%,68%,.24)');
+            glowTail.addColorStop(1, 'rgba(255,255,244,.94)');
+            ctx.strokeStyle = glowTail;
+            ctx.lineWidth = reducedMotion ? 11 : 20;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(oldest.x, oldest.y);
+            for (var t = comet.tail.length - 2; t >= 0; t--) ctx.lineTo(comet.tail[t].x, comet.tail[t].y);
+            ctx.stroke();
+
+            ctx.strokeStyle = 'rgba(255,255,245,.82)';
+            ctx.lineWidth = reducedMotion ? 2.5 : 4.5;
+            ctx.beginPath();
+            ctx.moveTo(oldest.x, oldest.y);
+            for (var j = comet.tail.length - 2; j >= 0; j--) ctx.lineTo(comet.tail[j].x, comet.tail[j].y);
+            ctx.stroke();
+          }
+          var glow = ctx.createRadialGradient(comet.x, comet.y, 0, comet.x, comet.y, reducedMotion ? 25 : 38);
+          glow.addColorStop(0, 'rgba(255,255,255,1)');
+          glow.addColorStop(.2, 'hsla(' + comet.hue + ',100%,82%,.95)');
+          glow.addColorStop(.58, 'hsla(' + comet.hue + ',100%,64%,.34)');
+          glow.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(comet.x, comet.y, reducedMotion ? 25 : 38, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#fffef1';
+          ctx.beginPath();
+          ctx.arc(comet.x, comet.y, reducedMotion ? 4.5 : 6.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
 
       function drawShootingStars() {
@@ -592,6 +896,7 @@
         }
 
         drawShootingStars();
+        drawComets();
 
         for (var j = 0; j < trails.length; j++) {
           var tr = trails[j];
@@ -641,10 +946,13 @@
 
       canvas.addEventListener('pointerdown', function (e) {
         e.preventDefault();
+        ensureAudio();
         canvas.setPointerCapture(e.pointerId);
         var point = pointerPoint(e);
         pointers.set(e.pointerId, { x: point.x, y: point.y, startX: point.x, startY: point.y, time: performance.now(), moved: false });
         stir(point.x, point.y, 0, 0, 1.15);
+        playTwinkle(point.x, point.y);
+        playWhoosh(1.15);
         markInteracted();
       });
 
@@ -655,15 +963,40 @@
         var point = pointerPoint(e);
         var dx = point.x - old.x, dy = point.y - old.y;
         if (Math.abs(point.x - old.startX) + Math.abs(point.y - old.startY) > 7) old.moved = true;
-        stir(point.x, point.y, dx, dy, Math.min(2.2, .75 + Math.sqrt(dx * dx + dy * dy) / 11));
+        var stirStrength = Math.min(2.2, .75 + Math.sqrt(dx * dx + dy * dy) / 11);
+        stir(point.x, point.y, dx, dy, stirStrength);
+        playTwinkle(point.x, point.y);
+        playWhoosh(stirStrength);
         old.x = point.x; old.y = point.y;
       });
 
       function endPointer(e) {
         var old = pointers.get(e.pointerId);
         if (!old) return;
-        if (!old.moved && performance.now() - old.time < 650) {
-          if (!catchStar(old.x, old.y)) supernova(old.x, old.y, 1);
+        var point = pointerPoint(e);
+        var now = performance.now();
+        var elapsed = Math.max(1, now - old.time);
+        var totalDx = point.x - old.startX;
+        var totalDy = point.y - old.startY;
+        var distance = Math.sqrt(totalDx * totalDx + totalDy * totalDy);
+        var fastSwipe = old.moved && elapsed < 520 && distance > Math.max(58, Math.min(W, H) * .09) && distance / elapsed > .42;
+        if (fastSwipe) {
+          launchComet((old.startX + point.x) * .5, (old.startY + point.y) * .5, totalDx, totalDy);
+        } else if (!old.moved && elapsed < 650) {
+          if (!catchStar(point.x, point.y)) {
+            var tapDx = point.x - lastTapX;
+            var tapDy = point.y - lastTapY;
+            if (now - lastTapAt < 360 && tapDx * tapDx + tapDy * tapDy < 6400) {
+              launchComet(point.x, point.y, Math.random() > .5 ? 1 : -1, (Math.random() - .5) * .7);
+              lastTapAt = 0;
+            } else {
+              playBloom();
+              supernova(point.x, point.y, 1);
+              lastTapAt = now;
+              lastTapX = point.x;
+              lastTapY = point.y;
+            }
+          }
         }
         pointers.delete(e.pointerId);
       }
@@ -673,17 +1006,21 @@
       canvas.addEventListener('keydown', function (e) {
         if (e.code === 'Space') {
           e.preventDefault();
+          ensureAudio();
           markInteracted();
           if (shootingStars.length) catchStar(shootingStars[0].x, shootingStars[0].y);
         } else if (e.code === 'Enter') {
           e.preventDefault();
+          ensureAudio();
           markInteracted();
+          playBloom();
           supernova(cx, cy, 1.35);
           status.textContent = 'Supernova!';
         }
       });
 
       colorButton.addEventListener('click', function () {
+        ensureAudio();
         paletteIndex = (paletteIndex + 1) % palettes.length;
         var p = palettes[paletteIndex];
         for (var i = 0; i < particles.length; i++) {
@@ -696,6 +1033,7 @@
       });
 
       tempoButton.addEventListener('click', function () {
+        ensureAudio();
         turbo = !turbo;
         tempoButton.setAttribute('aria-pressed', String(turbo));
         tempoButton.setAttribute('aria-label', turbo ? 'Turn turbo mode off' : 'Turn turbo mode on');
@@ -703,7 +1041,21 @@
         status.textContent = turbo ? 'Turbo mode on' : 'Turbo mode off';
       });
 
+      soundButton.addEventListener('click', function () {
+        if (muted) {
+          setMuted(false);
+          ensureAudio();
+          playTwinkle(cx, cy);
+          status.textContent = 'Sounds on';
+        } else {
+          setMuted(true);
+          status.textContent = 'Sounds muted';
+        }
+        markInteracted();
+      });
+
       resetButton.addEventListener('click', function () {
+        ensureAudio();
         starsCaught = 0;
         updateHud();
         rebuild();
