@@ -244,6 +244,8 @@
       var shelfHeight = window.innerHeight < 560 ? 92 : 110;
       var lastFrame = performance.now();
       var gravity = 1850;
+      var maxSpin = 2.35;
+      var maxCrashSpin = 4.2;
       var physicsRunning = true;
       var colors = ["#f15b64", "#ff9f43", "#ffd84f", "#53c77a", "#45b7df", "#8c72d9", "#ef71ae"];
       var shapes = [
@@ -435,7 +437,8 @@
         }
         block.vx = Math.max(-650, Math.min(650, block.vx));
         block.vy = Math.max(-480, Math.min(700, block.vy));
-        block.av += block.vx / Math.max(90, block.w) * .7;
+        block.av += block.vx / Math.max(90, block.w) * .22;
+        block.av = Math.max(-maxSpin, Math.min(maxSpin, block.av));
         block.sleeping = false;
         block.stillTime = 0;
         block.landedNotified = false;
@@ -467,12 +470,16 @@
         block.y += block.vy * dt;
         block.angle += block.av * dt;
         block.vx *= Math.pow(.993, dt*60);
-        block.av *= Math.pow(.994, dt*60);
+        block.av *= Math.pow(.985, dt*60);
+        block.av = Math.max(-(block.crashing ? maxCrashSpin : maxSpin), Math.min(block.crashing ? maxCrashSpin : maxSpin, block.av));
+        if (Math.abs(block.angle) > Math.PI * 2) {
+          block.angle %= Math.PI * 2;
+        }
 
         if (block.x < 2) {
-          block.x = 2; block.vx = Math.abs(block.vx)*.42; block.av += 1.4;
+          block.x = 2; block.vx = Math.abs(block.vx)*.42; block.av += .45;
         } else if (block.x + block.w > game.clientWidth-2) {
-          block.x = game.clientWidth-block.w-2; block.vx = -Math.abs(block.vx)*.42; block.av -= 1.4;
+          block.x = game.clientWidth-block.w-2; block.vx = -Math.abs(block.vx)*.42; block.av -= .45;
         }
 
         var floor = groundY();
@@ -520,7 +527,8 @@
           } else {
             var direction = center <= leftEdge+edgePad ? -1 : 1;
             block.vx += direction * 620 * dt;
-            block.av += direction * 7.2 * dt;
+            block.av += direction * 3.1 * dt;
+            block.av = Math.max(-maxSpin, Math.min(maxSpin, block.av));
             block.y += 1.5;
             block.stillTime = 0;
           }
@@ -603,7 +611,7 @@
           block.stillTime = 0;
           block.vx = direction * (190 + Math.random()*360);
           block.vy = -(330 + Math.random()*420);
-          block.av = direction * (4 + Math.random()*8);
+          block.av = direction * (2.2 + Math.random()*2);
           block.el.classList.add("crashing");
         });
         celebrated = false;
