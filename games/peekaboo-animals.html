@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- pwa-tags -->
+<meta name="pwa-tags" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Animals">
+<meta name="theme-color" content="#16a34a">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <link rel="icon" href="data:," />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@700;800&display=swap" rel="stylesheet">
+  <title>Peekaboo Animals</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --sky-top: #78d5f5;
+      --sky-bottom: #dff8ff;
+      --sun: #ffd757;
+      --hill-back: #8bd780;
+      --hill-front: #56ba72;
+      --soil: #ecad72;
+      --ink: #163d49;
+      --ink-soft: #426c72;
+      --card: rgba(255,255,255,.86);
+      --leaf-a: #30a868;
+      --leaf-b: #177d54;
+      --leaf-hi: #66cf72;
+      --button: #ff665d;
+      --button-dark: #d94843;
+      --focus: #174c79;
+      --cloud: rgba(255,255,255,.88);
+      --confetti-shadow: rgba(23,61,73,.14);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --sky-top: #183a5b;
+        --sky-bottom: #386b79;
+        --sun: #ffe8a3;
+        --hill-back: #3b765a;
+        --hill-front: #215c48;
+        --soil: #84593f;
+        --ink: #f2fbf8;
+        --ink-soft: #d2e9e5;
+        --card: rgba(16,49,56,.9);
+        --leaf-a: #27805b;
+        --leaf-b: #12513e;
+        --leaf-hi: #4e9f65;
+        --button: #ff8277;
+        --button-dark: #d85c56;
+        --focus: #ffe58f;
+        --cloud: rgba(225,242,241,.62);
+        --confetti-shadow: rgba(4,24,30,.24);
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      overflow-x: hidden;
+      background: var(--sky-top);
+      color: var(--ink);
+      font-family: "Nunito", ui-rounded, system-ui, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    button { font: inherit; }
+    .world {
+      position: relative;
+      min-height: 100svh;
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      isolation: isolate;
+      background: linear-gradient(var(--sky-top), var(--sky-bottom) 62%, var(--hill-back) 62%);
+    }
+    .world::before, .world::after {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      left: -12vw;
+      right: -12vw;
+      bottom: -16vh;
+      height: 47vh;
+      border-radius: 52% 48% 0 0 / 38% 36% 0 0;
+      background: var(--hill-back);
+    }
+    .world::after {
+      left: -28vw;
+      right: -24vw;
+      bottom: -29vh;
+      height: 56vh;
+      background: var(--hill-front);
+      transform: rotate(-2deg);
+    }
+    .sky-decor { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+    .sun { position: absolute; width: 82px; height: 82px; border-radius: 50%; background: var(--sun); top: 8%; left: 8%; box-shadow: 0 0 0 12px color-mix(in srgb, var(--sun) 22%, transparent); }
+    .cloud { position: absolute; width: 108px; height: 34px; border-radius: 99px; background: var(--cloud); top: 13%; right: 8%; opacity: .9; }
+    .cloud::before, .cloud::after { content:""; position:absolute; background:inherit; border-radius:50%; }
+    .cloud::before { width:48px; height:48px; left:16px; bottom:7px; }
+    .cloud::after { width:62px; height:62px; right:11px; bottom:4px; }
+    .cloud.two { transform: scale(.62); left: 17%; right:auto; top: 27%; opacity:.65; }
+
+    .topbar {
+      position: relative;
+      z-index: 20;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 0 max(18px, env(safe-area-inset-left));
+    }
+    .prompt { margin: 0; max-width: calc(100% - 110px); }
+    h1 {
+      margin: 0;
+      font: 600 clamp(1.8rem, 7vw, 3.4rem)/.98 "Fredoka", ui-rounded, sans-serif;
+      letter-spacing: -.035em;
+      text-wrap: balance;
+      text-shadow: 0 2px 0 rgba(255,255,255,.18);
+    }
+    .hint { margin: .45rem 0 0; font-size: clamp(.92rem, 3vw, 1.05rem); color: var(--ink-soft); }
+    .sound {
+      border: 0;
+      min-width: 80px;
+      height: 48px;
+      padding: 0 13px;
+      border-radius: 18px;
+      display: inline-flex;
+      gap: 7px;
+      align-items: center;
+      justify-content: center;
+      color: var(--ink);
+      background: var(--card);
+      box-shadow: 0 4px 0 rgba(19,72,76,.16);
+      cursor: pointer;
+    }
+    .sound:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(19,72,76,.16); }
+    .sound svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+    .sound .off { display:none; }
+    .sound.muted .on { display:none; }
+    .sound.muted .off { display:block; }
+    .sound span { font-size:.78rem; }
+
+    .play-wrap {
+      position: relative;
+      z-index: 5;
+      display: grid;
+      place-items: center;
+      min-height: 0;
+      padding: 12px 14px 0;
+    }
+    .stage {
+      position: relative;
+      width: min(92vw, 540px);
+      height: min(63svh, 550px);
+      min-height: 390px;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      cursor: pointer;
+      color: inherit;
+      touch-action: manipulation;
+    }
+    .stage:focus-visible, .sound:focus-visible { outline: 4px solid var(--focus); outline-offset: 4px; }
+    .message {
+      position: absolute;
+      z-index: 12;
+      top: 2%;
+      left: 50%;
+      transform: translateX(-50%) rotate(-1.5deg);
+      min-width: 170px;
+      max-width: 82%;
+      padding: 10px 18px 12px;
+      border-radius: 26px 26px 26px 8px;
+      background: var(--card);
+      box-shadow: 0 5px 0 rgba(26,77,70,.16);
+      font: 600 clamp(1.2rem, 5vw, 1.65rem)/1.05 "Fredoka", ui-rounded, sans-serif;
+      text-align: center;
+      transition: transform .25s ease, opacity .25s ease;
+    }
+    .message::after { content:""; position:absolute; left:22px; bottom:-11px; border: 12px solid transparent; border-top-color: var(--card); transform:rotate(12deg); }
+    .stage:not(.open) .message { opacity: 0; transform: translateX(-50%) translateY(8px) scale(.9); }
+
+    .animal {
+      --fur: #d99244;
+      --fur2: #f4bb6b;
+      --shown-y: -15px;
+      --shown-scale: 1;
+      position: absolute;
+      z-index: 4;
+      left: 50%;
+      bottom: 16%;
+      width: 215px;
+      height: 255px;
+      transform: translate(-50%, 72px) scale(.74) rotate(-3deg);
+      opacity: 0;
+      transition: transform .5s cubic-bezier(.16,1.25,.4,1), opacity .18s ease;
+      filter: drop-shadow(0 10px 0 rgba(22,71,53,.18));
+    }
+    .stage.open > .animal { transform: translate(-50%, var(--shown-y)) scale(var(--shown-scale)) rotate(0); opacity: 1; }
+    .body { position:absolute; left:50%; bottom:0; width:122px; height:122px; transform:translateX(-50%); border-radius:55% 55% 42% 42%; background:var(--fur); }
+    .head { position:absolute; z-index:4; left:50%; top:56px; width:150px; height:142px; transform:translateX(-50%); border-radius:50% 50% 46% 46%; background:var(--fur); }
+    .ear { position:absolute; z-index:1; top:47px; width:54px; height:61px; background:var(--fur); border-radius:55% 55% 43% 43%; }
+    .ear::after { content:""; position:absolute; inset:12px; background:var(--fur2); border-radius:inherit; }
+    .ear.left { left:25px; transform:rotate(-25deg); }
+    .ear.right { right:25px; transform:rotate(25deg); }
+    .eye { position:absolute; z-index:5; top:108px; width:16px; height:22px; border-radius:50%; background:#173c42; box-shadow: inset 5px 3px 0 #fff; }
+    .eye.left { left:66px; }
+    .eye.right { right:66px; }
+    .muzzle { position:absolute; z-index:5; top:140px; left:50%; width:74px; height:49px; transform:translateX(-50%); border-radius:50%; background:var(--fur2); }
+    .nose { position:absolute; z-index:6; top:145px; left:50%; width:20px; height:15px; transform:translateX(-50%); border-radius:50% 50% 55% 55%; background:#4f3532; }
+    .smile { position:absolute; z-index:6; top:158px; left:50%; width:34px; height:24px; transform:translateX(-50%); border-bottom:4px solid #4f3532; border-radius:0 0 50% 50%; }
+    .cheek { position:absolute; z-index:6; top:151px; width:23px; height:12px; border-radius:50%; background:rgba(247,112,105,.5); }
+    .cheek.left { left:54px; } .cheek.right { right:54px; }
+    .detail { display:none; position:absolute; }
+
+    /* Each friend gets a distinctive silhouette while sharing one friendly face. */
+    .animal.lion { --fur:#d88a36; --fur2:#f7ba68; }
+    .lion .mane { display:block; z-index:2; left:50%; top:38px; width:188px; height:181px; transform:translateX(-50%); border-radius:50%; background:#b75e32; box-shadow: -7px -3px 0 #c96d35, 7px 1px 0 #a9552f; }
+    .animal.bunny { --fur:#ece6dc; --fur2:#f3b6b0; }
+    .bunny .ear { top:1px; width:47px; height:108px; }
+    .bunny .ear.left { left:48px; transform:rotate(-10deg); } .bunny .ear.right { right:48px; transform:rotate(10deg); }
+    .animal.frog { --fur:#66c75f; --fur2:#a7df79; }
+    .frog .ear { width:57px; height:57px; top:53px; border-radius:50%; background:var(--fur); }
+    .frog .ear::after { inset:15px; background:#fff; box-shadow: inset 6px 2px 0 #173c42; }
+    .frog .head { border-radius:44% 44% 51% 51%; }
+    .frog .eye { display:none; }
+    .frog .muzzle { background:transparent; }
+    .animal.bear { --fur:#9a6743; --fur2:#d7a474; }
+    .bear .ear { width:56px; height:56px; top:52px; border-radius:50%; }
+    .animal.elephant { --fur:#90aebc; --fur2:#c0d2da; }
+    .elephant .ear { width:88px; height:104px; top:73px; border-radius:50%; }
+    .elephant .ear.left { left:3px; transform:rotate(-11deg); } .elephant .ear.right { right:3px; transform:rotate(11deg); }
+    .elephant .trunk { display:block; z-index:7; left:50%; top:153px; width:31px; height:66px; transform:translateX(-50%) rotate(4deg); border-radius:15px 15px 21px 21px; background:var(--fur); box-shadow: inset -5px 0 0 rgba(255,255,255,.12); }
+    .elephant .nose, .elephant .muzzle, .elephant .smile { display:none; }
+    .animal.fox { --fur:#ed763b; --fur2:#fff0dc; }
+    .fox .ear { top:34px; width:59px; height:77px; border-radius:10% 75% 38% 60%; }
+    .fox .ear.left { left:28px; transform:rotate(-19deg); } .fox .ear.right { right:28px; transform:scaleX(-1) rotate(-19deg); }
+    .fox .muzzle { width:82px; height:55px; }
+    .animal.cat { --fur:#dda74c; --fur2:#f3cf83; }
+    .cat .ear { top:34px; width:58px; height:72px; border-radius:8% 76% 40% 60%; }
+    .cat .ear.left { left:29px; transform:rotate(-18deg); } .cat .ear.right { right:29px; transform:scaleX(-1) rotate(-18deg); }
+    .cat .whiskers { display:block; z-index:8; left:50%; top:161px; width:118px; height:35px; transform:translateX(-50%); background:linear-gradient(9deg, transparent 43%, #594139 44% 47%, transparent 48%),linear-gradient(-9deg, transparent 43%, #594139 44% 47%, transparent 48%); opacity:.8; }
+
+    .bush { position:absolute; z-index:7; left:50%; bottom:7%; width:350px; height:280px; transform:translateX(-50%); pointer-events:none; }
+    .bush-half { position:absolute; bottom:0; width:205px; height:250px; transition: transform .56s cubic-bezier(.2,.85,.26,1); }
+    .bush-half.left { left:0; transform-origin:bottom left; }
+    .bush-half.right { right:0; transform-origin:bottom right; }
+    .stage.open .bush-half.left { transform:translateX(-68px) rotate(-11deg); }
+    .stage.open .bush-half.right { transform:translateX(68px) rotate(11deg); }
+    .leaf { position:absolute; width:110px; height:92px; border-radius:62% 38% 62% 38%; background:var(--leaf-a); box-shadow: inset -10px -8px 0 rgba(0,0,0,.08); }
+    .leaf:nth-child(2n) { background:var(--leaf-b); }
+    .leaf:nth-child(3n) { background:var(--leaf-hi); }
+    .left .leaf:nth-child(1) { left:15px; bottom:4px; transform:rotate(14deg); }
+    .left .leaf:nth-child(2) { left:75px; bottom:8px; transform:rotate(-17deg); }
+    .left .leaf:nth-child(3) { left:0; bottom:82px; transform:rotate(34deg); }
+    .left .leaf:nth-child(4) { left:76px; bottom:84px; transform:rotate(3deg); }
+    .left .leaf:nth-child(5) { left:54px; bottom:155px; transform:rotate(36deg); }
+    .right .leaf:nth-child(1) { right:15px; bottom:4px; transform:scaleX(-1) rotate(14deg); }
+    .right .leaf:nth-child(2) { right:75px; bottom:8px; transform:scaleX(-1) rotate(-17deg); }
+    .right .leaf:nth-child(3) { right:0; bottom:82px; transform:scaleX(-1) rotate(34deg); }
+    .right .leaf:nth-child(4) { right:76px; bottom:84px; transform:scaleX(-1) rotate(3deg); }
+    .right .leaf:nth-child(5) { right:54px; bottom:155px; transform:scaleX(-1) rotate(36deg); }
+    .tap-badge {
+      position:absolute;
+      z-index:10;
+      left:50%;
+      bottom:8%;
+      transform:translateX(-50%);
+      padding:13px 20px;
+      min-width:180px;
+      border-radius:999px;
+      background:var(--button);
+      color:#fff;
+      box-shadow:0 6px 0 var(--button-dark);
+      font:600 clamp(1.08rem, 4.6vw, 1.3rem)/1 "Fredoka", ui-rounded, sans-serif;
+      transition: transform .2s ease, opacity .2s ease;
+    }
+    .stage:active .tap-badge { transform:translateX(-50%) translateY(3px); box-shadow:0 3px 0 var(--button-dark); }
+    .stage.open .tap-badge { opacity:0; transform:translateX(-50%) translateY(12px); }
+    .ground-shadow { position:absolute; z-index:1; left:50%; bottom:6%; width:310px; height:47px; transform:translateX(-50%); border-radius:50%; background:rgba(13,75,55,.18); }
+
+    .spark { position:absolute; z-index:15; width:12px; height:22px; border-radius:70% 30% 70% 30%; pointer-events:none; animation:pop .8s ease-out forwards; }
+    @keyframes pop { from { transform:translate(-50%,-50%) scale(.25) rotate(0); opacity:1; } to { transform:translate(var(--dx),var(--dy)) scale(1) rotate(190deg); opacity:0; } }
+    @keyframes happyDance {
+      0%,100% { transform:translate(-50%,var(--shown-y)) scale(var(--shown-scale)) rotate(0); }
+      18% { transform:translate(-50%,calc(var(--shown-y) - 12px)) scale(var(--shown-scale)) rotate(-5deg); }
+      38% { transform:translate(-50%,calc(var(--shown-y) - 3px)) scale(var(--shown-scale)) rotate(5deg); }
+      58% { transform:translate(-50%,calc(var(--shown-y) - 14px)) scale(var(--shown-scale)) rotate(-4deg); }
+      78% { transform:translate(-50%,calc(var(--shown-y) - 4px)) scale(var(--shown-scale)) rotate(4deg); }
+    }
+    .stage.open.celebrate > .animal { animation:happyDance .86s .08s ease-in-out; }
+
+    .parade {
+      position:absolute;
+      z-index:16;
+      left:2%;
+      right:2%;
+      bottom:5%;
+      height:205px;
+      display:flex;
+      align-items:flex-end;
+      justify-content:center;
+      pointer-events:none;
+      opacity:0;
+      visibility:hidden;
+      transition:opacity .16s ease;
+    }
+    .parade.show { opacity:1; visibility:visible; }
+    .parade-slot { position:relative; width:14.285%; height:100%; }
+    .parade .parade-friend.animal {
+      --parade-scale:.255;
+      z-index:1;
+      left:50%;
+      bottom:0;
+      opacity:0;
+      transform-origin:bottom center;
+      transform:translateX(-50%) translateY(96px) scale(var(--parade-scale));
+      filter:drop-shadow(0 20px 0 var(--confetti-shadow));
+      transition:none;
+    }
+    .parade.show .parade-friend.animal {
+      animation:paradePop 1.55s var(--delay) cubic-bezier(.18,.88,.28,1.2) both;
+    }
+    @keyframes paradePop {
+      0% { opacity:0; transform:translateX(-50%) translateY(96px) scale(var(--parade-scale)) rotate(-7deg); }
+      22% { opacity:1; transform:translateX(-50%) translateY(0) scale(var(--parade-scale)) rotate(4deg); }
+      42% { transform:translateX(-50%) translateY(-18px) scale(var(--parade-scale)) rotate(-5deg); }
+      62% { transform:translateX(-50%) translateY(0) scale(var(--parade-scale)) rotate(5deg); }
+      82% { opacity:1; transform:translateX(-50%) translateY(-10px) scale(var(--parade-scale)) rotate(-3deg); }
+      100% { opacity:0; transform:translateX(-50%) translateY(70px) scale(var(--parade-scale)) rotate(3deg); }
+    }
+    .stage.parade-time > .animal { opacity:.14; transform:translate(-50%,calc(var(--shown-y) + 16px)) scale(var(--shown-scale)); }
+    .confetti {
+      position:absolute;
+      z-index:19;
+      top:2%;
+      width:12px;
+      height:19px;
+      border-radius:4px;
+      pointer-events:none;
+      animation:confettiFall 1.6s var(--delay) cubic-bezier(.12,.6,.28,1) forwards;
+    }
+    @keyframes confettiFall {
+      0% { opacity:0; transform:translate(0,-28px) rotate(0); }
+      12% { opacity:1; }
+      100% { opacity:0; transform:translate(var(--drift),var(--fall)) rotate(var(--spin)); }
+    }
+
+    .footer-note { position:relative; z-index:20; text-align:center; padding:7px 18px max(14px, env(safe-area-inset-bottom)); font-size:.84rem; color:var(--ink-soft); }
+
+    @media (max-width: 430px) {
+      .sun { width:62px; height:62px; top:11%; left:-13px; }
+      .cloud { top:18%; right:-26px; transform:scale(.72); }
+      .cloud.two { display:none; }
+      .topbar { padding-top:max(14px, env(safe-area-inset-top)); }
+      .hint { display:none; }
+      .sound { min-width:48px; width:48px; padding:0; border-radius:16px; }
+      .sound span { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+      .stage { width:100%; height:min(69svh, 570px); min-height:410px; }
+      .animal { width:205px; transform:translate(-50%,68px) scale(.7) rotate(-3deg); }
+      .bush { width:330px; transform:translateX(-50%) scale(.92); transform-origin:bottom center; }
+      .stage.open .bush-half.left { transform:translateX(-45px) rotate(-9deg); }
+      .stage.open .bush-half.right { transform:translateX(45px) rotate(9deg); }
+      .message { top:3%; }
+      .parade { left:0; right:0; height:190px; bottom:4%; }
+      .parade .parade-friend.animal { --parade-scale:.205; }
+    }
+    @media (max-height: 640px) {
+      .topbar { padding-top:10px; }
+      .stage { height:475px; min-height:390px; }
+      .animal { --shown-y:0px; --shown-scale:.86; bottom:12%; transform:translate(-50%,72px) scale(.72); }
+      .stage.open > .animal { transform:translate(-50%,var(--shown-y)) scale(var(--shown-scale)); }
+      .parade { bottom:0; height:170px; }
+      .parade .parade-friend.animal { --parade-scale:.2; bottom:0; }
+      .bush { bottom:1%; transform:translateX(-50%) scale(.82); transform-origin:bottom center; }
+      .tap-badge { bottom:4%; }
+      .footer-note { display:none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="world">
+    <div class="sky-decor" aria-hidden="true"><div class="sun"></div><div class="cloud"></div><div class="cloud two"></div></div>
+    <header class="topbar">
+      <div class="prompt">
+        <h1 id="heading">Who’s hiding?</h1>
+        <p class="hint">Tap the leafy bush to say hello.</p>
+      </div>
+      <button class="sound" id="soundButton" type="button" aria-label="Mute sounds" aria-pressed="false">
+        <svg class="on" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9v6h4l5 4V5L9 9H5Z"/><path d="M17 9c1.4 1.7 1.4 4.3 0 6"/><path d="M19.5 6.5a8 8 0 0 1 0 11"/></svg>
+        <svg class="off" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9v6h4l5 4V5L9 9H5Z"/><path d="m18 9 5 5m0-5-5 5"/></svg>
+        <span>Sound</span>
+      </button>
+    </header>
+
+    <section class="play-wrap" aria-labelledby="heading">
+      <button class="stage" id="stage" type="button" aria-label="Tap to reveal the hidden animal">
+        <div class="message" id="message" aria-live="polite">Hello, Lion!</div>
+        <div class="ground-shadow" aria-hidden="true"></div>
+        <div class="animal lion" id="animal" aria-hidden="true">
+          <div class="detail mane"></div>
+          <div class="ear left"></div><div class="ear right"></div>
+          <div class="body"></div><div class="head"></div>
+          <div class="eye left"></div><div class="eye right"></div>
+          <div class="muzzle"></div><div class="nose"></div><div class="smile"></div>
+          <div class="cheek left"></div><div class="cheek right"></div>
+          <div class="detail trunk"></div><div class="detail whiskers"></div>
+        </div>
+        <div class="parade" id="parade" aria-hidden="true"></div>
+        <div class="bush" aria-hidden="true">
+          <div class="bush-half left"><i class="leaf"></i><i class="leaf"></i><i class="leaf"></i><i class="leaf"></i><i class="leaf"></i></div>
+          <div class="bush-half right"><i class="leaf"></i><i class="leaf"></i><i class="leaf"></i><i class="leaf"></i><i class="leaf"></i></div>
+        </div>
+        <div class="tap-badge" id="tapBadge">Tap for peekaboo!</div>
+      </button>
+    </section>
+    <p class="footer-note" id="footerNote">Every peek finds a new friend.</p>
+  </main>
+
+  <script>
+    (function () {
+      var friends = [
+        { kind: 'lion', name: 'Lion', pitch: 330, sound: 'chirp' },
+        { kind: 'bunny', name: 'Bunny', pitch: 440, sound: 'boing' },
+        { kind: 'frog', name: 'Frog', pitch: 265, sound: 'bloop' },
+        { kind: 'bear', name: 'Bear', pitch: 220, sound: 'boing' },
+        { kind: 'elephant', name: 'Elephant', pitch: 185, sound: 'toot' },
+        { kind: 'fox', name: 'Fox', pitch: 390, sound: 'chirp' },
+        { kind: 'cat', name: 'Kitty', pitch: 510, sound: 'chirp' }
+      ];
+      var index = -1;
+      var revealCount = 0;
+      var busy = false;
+      var muted = false;
+      var audioContext = null;
+      var stage = document.getElementById('stage');
+      var animal = document.getElementById('animal');
+      var parade = document.getElementById('parade');
+      var message = document.getElementById('message');
+      var soundButton = document.getElementById('soundButton');
+      var tapBadge = document.getElementById('tapBadge');
+      var colors = ['#ffd54f','#ff7b72','#67d8ee','#ff9ac2','#f5f2de','#8be06d'];
+
+      friends.forEach(function (friend, friendIndex) {
+        var slot = document.createElement('div');
+        var paradeFriend = animal.cloneNode(true);
+        slot.className = 'parade-slot';
+        paradeFriend.removeAttribute('id');
+        paradeFriend.className = 'animal parade-friend ' + friend.kind;
+        paradeFriend.style.setProperty('--delay', (friendIndex * .075) + 's');
+        slot.appendChild(paradeFriend);
+        parade.appendChild(slot);
+      });
+
+      function getAudio() {
+        if (!audioContext) {
+          var AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) audioContext = new AudioCtx();
+        }
+        if (audioContext && audioContext.state === 'suspended') audioContext.resume();
+        return audioContext;
+      }
+
+      function tone(ctx, type, startFreq, endFreq, start, duration, volume) {
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(startFreq, start);
+        osc.frequency.exponentialRampToValueAtTime(Math.max(50, endFreq), start + duration);
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(volume, start + .025);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(start); osc.stop(start + duration + .03);
+      }
+
+      function playFriend(friend) {
+        if (muted) return;
+        var ctx = getAudio();
+        if (!ctx) return;
+        var now = ctx.currentTime + .02;
+        var p = friend.pitch;
+        if (friend.sound === 'boing') {
+          tone(ctx, 'sine', p * 1.7, p * .82, now, .34, .045);
+          tone(ctx, 'triangle', p * 2.3, p * 1.15, now + .025, .26, .014);
+        } else if (friend.sound === 'bloop') {
+          tone(ctx, 'sine', p * .82, p * 1.28, now, .14, .035);
+          tone(ctx, 'sine', p, p * 1.5, now + .15, .16, .04);
+        } else if (friend.sound === 'toot') {
+          tone(ctx, 'triangle', p, p * 1.18, now, .3, .034);
+          tone(ctx, 'sine', p * 2, p * 1.72, now + .04, .3, .018);
+        } else {
+          tone(ctx, 'sine', p, p * 1.45, now, .13, .036);
+          tone(ctx, 'sine', p * 1.22, p * 1.82, now + .13, .17, .04);
+        }
+      }
+
+      function playParade() {
+        if (muted) return;
+        var ctx = getAudio();
+        if (!ctx) return;
+        var now = ctx.currentTime + .02;
+        [294, 370, 440, 587].forEach(function (pitch, noteIndex) {
+          tone(ctx, 'sine', pitch, pitch * 1.04, now + noteIndex * .13, .22, .027);
+          tone(ctx, 'triangle', pitch * 2, pitch * 1.9, now + noteIndex * .13, .18, .009);
+        });
+      }
+
+      function sprinkle() {
+        var rect = stage.getBoundingClientRect();
+        for (var i = 0; i < 12; i++) {
+          var bit = document.createElement('i');
+          bit.className = 'spark';
+          bit.style.left = (rect.width / 2 + (Math.random() - .5) * 80) + 'px';
+          bit.style.top = (rect.height * .45) + 'px';
+          bit.style.background = colors[i % colors.length];
+          bit.style.setProperty('--dx', ((Math.random() - .5) * 300) + 'px');
+          bit.style.setProperty('--dy', (-70 - Math.random() * 170) + 'px');
+          bit.style.animationDelay = (Math.random() * .12) + 's';
+          stage.appendChild(bit);
+          window.setTimeout((function (node) { return function () { node.remove(); }; })(bit), 1000);
+        }
+      }
+
+      function confettiBurst() {
+        var rect = stage.getBoundingClientRect();
+        for (var i = 0; i < 42; i++) {
+          var piece = document.createElement('i');
+          piece.className = 'confetti';
+          piece.style.left = (5 + Math.random() * 90) + '%';
+          piece.style.background = colors[i % colors.length];
+          piece.style.setProperty('--delay', (Math.random() * .28) + 's');
+          piece.style.setProperty('--drift', ((Math.random() - .5) * Math.min(rect.width * .34, 160)) + 'px');
+          piece.style.setProperty('--fall', (rect.height * (.56 + Math.random() * .3)) + 'px');
+          piece.style.setProperty('--spin', ((Math.random() > .5 ? 1 : -1) * (320 + Math.random() * 520)) + 'deg');
+          stage.appendChild(piece);
+          window.setTimeout((function (node) { return function () { node.remove(); }; })(piece), 2100);
+        }
+      }
+
+      function showNext() {
+        if (busy) return;
+        busy = true;
+        stage.classList.remove('open', 'celebrate', 'parade-time');
+        parade.classList.remove('show');
+        tapBadge.textContent = 'Tap for peekaboo!';
+        window.setTimeout(function () {
+          index = (index + 1) % friends.length;
+          revealCount += 1;
+          var friend = friends[index];
+          var isParadeReveal = revealCount % 3 === 0;
+          animal.className = 'animal ' + friend.kind;
+          message.textContent = 'Hello, ' + friend.name + '!';
+          stage.setAttribute('aria-label', friend.name + ' says hello. Tap for another animal');
+          stage.classList.add('open', 'celebrate');
+          tapBadge.textContent = 'Another friend!';
+          playFriend(friend);
+          sprinkle();
+
+          if (isParadeReveal) {
+            window.setTimeout(function () {
+              stage.classList.remove('celebrate');
+              stage.classList.add('parade-time');
+              parade.classList.add('show');
+              message.textContent = 'Everybody dance!';
+              stage.setAttribute('aria-label', 'All the animal friends are dancing');
+              confettiBurst();
+              playParade();
+            }, 980);
+            window.setTimeout(function () {
+              parade.classList.remove('show');
+              stage.classList.remove('parade-time');
+              message.textContent = 'Hello, ' + friend.name + '!';
+              stage.setAttribute('aria-label', friend.name + ' says hello. Tap for another animal');
+              busy = false;
+            }, 2750);
+          } else {
+            window.setTimeout(function () { busy = false; }, 880);
+          }
+        }, index < 0 ? 70 : 360);
+      }
+
+      stage.addEventListener('click', showNext);
+      soundButton.addEventListener('click', function () {
+        muted = !muted;
+        soundButton.classList.toggle('muted', muted);
+        soundButton.setAttribute('aria-pressed', String(muted));
+        soundButton.setAttribute('aria-label', muted ? 'Turn sounds on' : 'Mute sounds');
+        soundButton.querySelector('span').textContent = muted ? 'Muted' : 'Sound';
+        if (!muted) {
+          var ctx = getAudio();
+          if (ctx) tone(ctx, 'sine', 420, 610, ctx.currentTime + .01, .12, .026);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

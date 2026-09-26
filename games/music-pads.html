@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- pwa-tags -->
+<meta name="pwa-tags" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Music">
+<meta name="theme-color" content="#f97316">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#f6f0df" />
+  <link rel="icon" href="data:," />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&display=swap" rel="stylesheet" />
+  <title>Music Pads</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --ink: #203141;
+      --muted: #586572;
+      --paper: #f6f0df;
+      --surface: #fffaf0;
+      --line: rgba(32, 49, 65, .13);
+      --button: #203141;
+      --button-ink: #fffaf0;
+      --shadow: rgba(35, 39, 44, .16);
+      --focus: #1b5676;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --ink: #f8f1df;
+        --muted: #b7c1c8;
+        --paper: #101b24;
+        --surface: #182630;
+        --line: rgba(255,255,255,.13);
+        --button: #f8f1df;
+        --button-ink: #17242e;
+        --shadow: rgba(0,0,0,.30);
+        --focus: #9fdcff;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      min-height: 100svh;
+      overflow-x: hidden;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Fredoka", "Avenir Next Rounded", "Trebuchet MS", sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    button { font: inherit; }
+    button:focus-visible { outline: 4px solid var(--focus); outline-offset: 4px; }
+
+    .app {
+      width: min(1100px, 100%);
+      min-height: 100svh;
+      margin: 0 auto;
+      padding: max(18px, env(safe-area-inset-top)) clamp(16px, 4vw, 42px) max(22px, env(safe-area-inset-bottom));
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: clamp(16px, 3vh, 28px);
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .intro { min-width: 0; }
+    h1 {
+      margin: 0;
+      max-width: 720px;
+      font-size: clamp(1.55rem, 4.8vw, 3rem);
+      line-height: .98;
+      letter-spacing: -.035em;
+      font-weight: 600;
+    }
+    .hint {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-family: ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+      font-size: clamp(.88rem, 2vw, 1.05rem);
+      font-weight: 700;
+    }
+    .controls { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+    .song, .tune, .mute {
+      border: 0;
+      cursor: pointer;
+      min-height: 46px;
+      background: var(--button);
+      color: var(--button-ink);
+      box-shadow: 0 5px 0 color-mix(in srgb, var(--button) 72%, transparent);
+      transition: transform 100ms ease, box-shadow 100ms ease, background 160ms ease;
+    }
+    .song:active, .tune:active, .mute:active { transform: translateY(4px); box-shadow: 0 1px 0 color-mix(in srgb, var(--button) 72%, transparent); }
+    .song, .tune {
+      padding: 0 14px;
+      border-radius: 14px 14px 9px 14px;
+      font-size: .88rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .song { border-radius: 14px 9px 14px 11px; }
+    .song[aria-pressed="true"] {
+      background: #ffc454;
+      color: #24313a;
+      box-shadow: 0 5px 0 #b97721;
+    }
+    .song[aria-pressed="true"]::before { content: "● "; }
+    .song:disabled, .tune:disabled { cursor: default; opacity: .48; }
+    .mute {
+      width: 46px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+    }
+    .mute svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.25; stroke-linecap: round; stroke-linejoin: round; }
+    .mute .off-mark { display: none; }
+    .mute[aria-pressed="true"] .waves { display: none; }
+    .mute[aria-pressed="true"] .off-mark { display: block; }
+
+    .pads {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-rows: repeat(2, minmax(150px, 1fr));
+      gap: clamp(10px, 2vw, 18px);
+    }
+    .pad {
+      --pad: #e66b55;
+      --pad-dark: #a84135;
+      position: relative;
+      overflow: hidden;
+      border: 0;
+      min-height: 140px;
+      padding: 16px;
+      cursor: pointer;
+      touch-action: manipulation;
+      background: var(--pad);
+      color: #182733;
+      box-shadow: 0 8px 0 var(--pad-dark), 0 12px 22px var(--shadow);
+      transform: translateY(0);
+      transition: transform 90ms ease, box-shadow 90ms ease, filter 90ms ease;
+      isolation: isolate;
+    }
+    .pad:nth-child(1) { --pad:#ff8d73; --pad-dark:#bd5545; border-radius: 36px 18px 28px 20px; }
+    .pad:nth-child(2) { --pad:#ffc454; --pad-dark:#b97721; border-radius: 20px 34px 18px 26px; }
+    .pad:nth-child(3) { --pad:#f1df55; --pad-dark:#a58e24; border-radius: 31px 19px 36px 17px; }
+    .pad:nth-child(4) { --pad:#80d17b; --pad-dark:#408b4b; border-radius: 17px 30px 22px 36px; }
+    .pad:nth-child(5) { --pad:#64d8cf; --pad-dark:#297f85; border-radius: 18px 36px 20px 30px; }
+    .pad:nth-child(6) { --pad:#68b8ed; --pad-dark:#3474aa; border-radius: 34px 20px 30px 18px; }
+    .pad:nth-child(7) { --pad:#a895e8; --pad-dark:#6456a5; border-radius: 22px 30px 17px 35px; }
+    .pad:nth-child(8) { --pad:#ef91bd; --pad-dark:#a84f7c; border-radius: 30px 18px 35px 23px; }
+    .pad::before, .pad::after {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      border: 3px solid rgba(255,255,255,.35);
+      border-radius: 999px;
+    }
+    .pad::before { width: 58px; height: 58px; right: 14%; top: 11%; }
+    .pad::after { width: 20px; height: 20px; left: 15%; bottom: 18%; background: rgba(255,255,255,.22); }
+    .pad:hover { filter: saturate(1.07); }
+    .pad.is-guided {
+      outline: 7px solid rgba(255,255,255,.92);
+      outline-offset: -10px;
+      filter: brightness(1.14) saturate(1.12);
+      animation: guidePulse 720ms ease-in-out infinite alternate;
+    }
+    .pad.is-guided .pad-icon { color: rgba(20, 38, 48, .92); }
+    .pad.is-playing, .pad:active {
+      transform: translateY(7px);
+      box-shadow: 0 1px 0 var(--pad-dark), 0 4px 8px var(--shadow);
+      filter: brightness(1.07) saturate(1.1);
+    }
+    .pad-icon {
+      position: absolute;
+      width: clamp(54px, 8vw, 88px);
+      height: clamp(54px, 8vw, 88px);
+      inset: 50% auto auto 50%;
+      transform: translate(-50%, -50%);
+      color: rgba(20, 38, 48, .73);
+    }
+    .pad-icon svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+    .pad-name {
+      position: absolute;
+      left: 16px;
+      top: 13px;
+      color: rgba(17, 35, 46, .7);
+      font: 800 .78rem/1 ui-rounded, system-ui, sans-serif;
+      letter-spacing: .02em;
+    }
+    .ripple {
+      position: absolute;
+      width: 18px; height: 18px;
+      border: 4px solid rgba(255,255,255,.72);
+      border-radius: 50%;
+      pointer-events: none;
+      transform: translate(-50%, -50%) scale(.2);
+      animation: bloom 700ms ease-out forwards;
+    }
+    .float-note {
+      position: fixed;
+      z-index: 20;
+      pointer-events: none;
+      font-family: Georgia, serif;
+      font-weight: 700;
+      color: var(--ink);
+      opacity: .72;
+      animation: floatAway 850ms ease-out forwards;
+    }
+    .status {
+      position: fixed;
+      left: 50%; bottom: max(14px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      background: var(--ink);
+      color: var(--paper);
+      border-radius: 999px;
+      padding: 9px 15px;
+      font: 700 .82rem/1 ui-rounded, system-ui, sans-serif;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease;
+      z-index: 30;
+    }
+    .status.show { opacity: 1; }
+
+    @keyframes bloom { to { transform: translate(-50%, -50%) scale(10); opacity: 0; } }
+    @keyframes floatAway { from { transform: translate(-50%, -10%) rotate(-6deg) scale(.8); } to { transform: translate(-50%, -170%) rotate(12deg) scale(1.35); opacity: 0; } }
+    @keyframes guidePulse { from { outline-width: 5px; } to { outline-width: 10px; } }
+
+    @media (max-width: 680px) {
+      .app { gap: 14px; padding-left: 12px; padding-right: 12px; }
+      h1 { font-size: clamp(1.55rem, 8vw, 2.2rem); }
+      .hint { font-size: .82rem; }
+      .song, .tune { min-height: 42px; padding: 0 12px; font-size: .8rem; }
+      .mute { width: 42px; min-height: 42px; }
+      .pads { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(108px, 1fr)); gap: 10px; }
+      .pad { min-height: 104px; box-shadow: 0 6px 0 var(--pad-dark), 0 9px 16px var(--shadow); }
+      .pad.is-playing, .pad:active { transform: translateY(5px); }
+      .pad-icon { width: clamp(48px, 16vw, 72px); height: clamp(48px, 16vw, 72px); }
+      .pad-name { left: 13px; top: 11px; font-size: .7rem; }
+    }
+    @media (max-width: 520px) {
+      .topbar { align-items: flex-start; }
+      .hint { margin-top: 4px; }
+      .song, .tune { width: 42px; padding: 0; font-size: 0; }
+      .song::after { content: "♬"; font: 700 1.35rem/1 Georgia, serif; }
+      .tune::after { content: "♪"; font: 700 1.45rem/1 Georgia, serif; }
+      .song[aria-pressed="true"]::before { content: none; }
+    }
+    @media (max-height: 620px) and (orientation: landscape) {
+      .app { gap: 10px; padding-top: 10px; padding-bottom: 12px; }
+      .hint { display: none; }
+      .pads { grid-template-rows: repeat(2, minmax(90px, 1fr)); gap: 10px; }
+      .pad { min-height: 90px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+      .float-note { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="intro">
+        <h1>Tap a color. Make a song.</h1>
+        <p class="hint">Every note sounds happy together</p>
+      </div>
+      <div class="controls">
+        <button class="song" id="song" type="button" aria-label="Turn follow the lights song mode on" aria-pressed="false">Follow lights</button>
+        <button class="tune" id="tune" type="button" aria-label="Play a little tune">Play a tune</button>
+        <button class="mute" id="mute" type="button" aria-label="Mute sounds" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 10v4h3l4 3V7l-4 3H4Z"></path>
+            <path class="waves" d="M15 9.2c.9.8.9 4.8 0 5.6M18 7c2.8 2.3 2.8 7.7 0 10"></path>
+            <path class="off-mark" d="m15.5 9.5 5 5m0-5-5 5"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <section class="pads" aria-label="Musical touch pads">
+      <button class="pad" type="button" data-note="261.63" data-index="0" aria-label="Play low do note"><span class="pad-name">DO</span><span class="pad-icon"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="27"/><circle cx="50" cy="50" r="9"/></svg></span></button>
+      <button class="pad" type="button" data-note="293.66" data-index="1" aria-label="Play re note"><span class="pad-name">RE</span><span class="pad-icon"><svg viewBox="0 0 100 100"><path d="M27 66 50 24l23 42Z"/><circle cx="50" cy="59" r="5"/></svg></span></button>
+      <button class="pad" type="button" data-note="329.63" data-index="2" aria-label="Play mi note"><span class="pad-name">MI</span><span class="pad-icon"><svg viewBox="0 0 100 100"><path d="m50 21 9 20 22 3-16 15 4 22-19-10-19 10 4-22-16-15 22-3Z"/></svg></span></button>
+      <button class="pad" type="button" data-note="392.00" data-index="3" aria-label="Play sol note"><span class="pad-name">SOL</span><span class="pad-icon"><svg viewBox="0 0 100 100"><path d="M24 31c16-11 36-8 50 5M22 51c18-12 40-10 56 3M29 70c13-7 29-6 41 1"/></svg></span></button>
+      <button class="pad" type="button" data-note="440.00" data-index="4" aria-label="Play la note"><span class="pad-name">LA</span><span class="pad-icon"><svg viewBox="0 0 100 100"><path d="M28 28h44v44H28z"/><path d="m28 28 44 44M72 28 28 72"/></svg></span></button>
+      <button class="pad" type="button" data-note="523.25" data-index="5" aria-label="Play high do note"><span class="pad-name">DO</span><span class="pad-icon"><svg viewBox="0 0 100 100"><path d="M50 20c6 12 9 15 21 21-12 6-15 9-21 21-6-12-9-15-21-21 12-6 15-9 21-21Z"/><path d="M25 66c3 6 5 8 12 11-7 3-9 5-12 11-3-6-5-8-12-11 7-3 9-5 12-11Z"/></svg></span></button>
+      <button class="pad" type="button" data-note="587.33" data-index="6" aria-label="Play high re note"><span class="pad-name">RE</span><span class="pad-icon"><svg viewBox="0 0 100 100"><path d="M50 22c18 0 30 12 30 29 0 18-14 29-30 29S20 69 20 51c0-17 12-29 30-29Z"/><path d="M38 48h24M38 60h24"/></svg></span></button>
+      <button class="pad" type="button" data-note="659.25" data-index="7" aria-label="Play high mi note"><span class="pad-name">MI</span><span class="pad-icon"><svg viewBox="0 0 100 100"><path d="M31 72V31l38-8v41"/><circle cx="24" cy="73" r="10"/><circle cx="62" cy="65" r="10"/><path d="M31 43l38-8"/></svg></span></button>
+    </section>
+  </main>
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+
+  <script>
+    (function () {
+      "use strict";
+      var AudioCtx = window.AudioContext || window.webkitAudioContext;
+      var ctx = null;
+      var master = null;
+      var muted = false;
+      var tuneRunning = false;
+      var songMode = false;
+      var songStep = 0;
+      var songTimer = null;
+      var guidedPad = null;
+      var songMelody = [0, 2, 3, 4, 3, 2, 0, 5];
+      var pads = Array.prototype.slice.call(document.querySelectorAll(".pad"));
+      var muteButton = document.getElementById("mute");
+      var tuneButton = document.getElementById("tune");
+      var songButton = document.getElementById("song");
+      var status = document.getElementById("status");
+      var statusTimer = null;
+
+      function initAudio() {
+        if (!AudioCtx) return false;
+        if (!ctx) {
+          ctx = new AudioCtx();
+          master = ctx.createGain();
+          master.gain.value = muted ? 0 : 0.22;
+          var compressor = ctx.createDynamicsCompressor();
+          compressor.threshold.value = -20;
+          compressor.knee.value = 18;
+          compressor.ratio.value = 5;
+          compressor.attack.value = 0.01;
+          compressor.release.value = 0.22;
+          master.connect(compressor);
+          compressor.connect(ctx.destination);
+        }
+        if (ctx.state === "suspended") ctx.resume();
+        return true;
+      }
+
+      function playTone(frequency, index) {
+        if (!initAudio() || muted) return;
+        var now = ctx.currentTime;
+        var voice = ctx.createGain();
+        var tone = ctx.createOscillator();
+        var shimmer = ctx.createOscillator();
+        var shimmerGain = ctx.createGain();
+        var filter = ctx.createBiquadFilter();
+        var pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+
+        tone.type = "sine";
+        tone.frequency.setValueAtTime(frequency, now);
+        shimmer.type = "triangle";
+        shimmer.frequency.setValueAtTime(frequency * 2, now);
+        shimmer.detune.setValueAtTime(index % 2 ? 3 : -3, now);
+
+        voice.gain.setValueAtTime(0.0001, now);
+        voice.gain.exponentialRampToValueAtTime(0.24, now + 0.015);
+        voice.gain.exponentialRampToValueAtTime(0.09, now + 0.16);
+        voice.gain.exponentialRampToValueAtTime(0.0001, now + 1.15);
+        shimmerGain.gain.setValueAtTime(0.055, now);
+        shimmerGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.48);
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(Math.min(3100, frequency * 7), now);
+        filter.Q.value = 0.7;
+        if (pan) pan.pan.value = (index - 3.5) / 9;
+
+        tone.connect(filter);
+        shimmer.connect(shimmerGain);
+        shimmerGain.connect(filter);
+        filter.connect(voice);
+        if (pan) { voice.connect(pan); pan.connect(master); } else { voice.connect(master); }
+        tone.start(now);
+        shimmer.start(now);
+        tone.stop(now + 1.2);
+        shimmer.stop(now + 1.2);
+      }
+
+      function visualHit(pad, clientX, clientY) {
+        pad.classList.add("is-playing");
+        window.setTimeout(function () { pad.classList.remove("is-playing"); }, 170);
+
+        var rect = pad.getBoundingClientRect();
+        var ripple = document.createElement("span");
+        ripple.className = "ripple";
+        ripple.style.left = ((clientX || rect.left + rect.width / 2) - rect.left) + "px";
+        ripple.style.top = ((clientY || rect.top + rect.height / 2) - rect.top) + "px";
+        pad.appendChild(ripple);
+        window.setTimeout(function () { ripple.remove(); }, 720);
+
+        if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          var note = document.createElement("span");
+          note.className = "float-note";
+          note.textContent = Number(pad.dataset.index) % 3 === 0 ? "♫" : "♪";
+          note.style.left = (rect.left + rect.width * (0.35 + Math.random() * 0.3)) + "px";
+          note.style.top = (rect.top + rect.height * 0.52) + "px";
+          note.style.fontSize = (24 + Math.random() * 18) + "px";
+          document.body.appendChild(note);
+          window.setTimeout(function () { note.remove(); }, 900);
+        }
+      }
+
+      function clearGuide() {
+        window.clearTimeout(songTimer);
+        songTimer = null;
+        if (guidedPad) guidedPad.classList.remove("is-guided");
+        guidedPad = null;
+      }
+
+      function showNextGuide() {
+        if (!songMode) return;
+        clearGuide();
+        guidedPad = pads[songMelody[songStep % songMelody.length]];
+        songStep += 1;
+        guidedPad.classList.add("is-guided");
+        playTone(Number(guidedPad.dataset.note), Number(guidedPad.dataset.index));
+        songTimer = window.setTimeout(showNextGuide, 1450);
+      }
+
+      function hitPad(pad, x, y) {
+        playTone(Number(pad.dataset.note), Number(pad.dataset.index));
+        visualHit(pad, x, y);
+        if (songMode) {
+          clearGuide();
+          songTimer = window.setTimeout(showNextGuide, 300);
+        }
+      }
+
+      pads.forEach(function (pad) {
+        pad.addEventListener("pointerdown", function (event) {
+          event.preventDefault();
+          hitPad(pad, event.clientX, event.clientY);
+        });
+        pad.addEventListener("keydown", function (event) {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            hitPad(pad);
+          }
+        });
+      });
+
+      function showStatus(message) {
+        status.textContent = message;
+        status.classList.add("show");
+        window.clearTimeout(statusTimer);
+        statusTimer = window.setTimeout(function () { status.classList.remove("show"); }, 1200);
+      }
+
+      muteButton.addEventListener("click", function () {
+        initAudio();
+        muted = !muted;
+        muteButton.setAttribute("aria-pressed", String(muted));
+        muteButton.setAttribute("aria-label", muted ? "Turn sounds on" : "Mute sounds");
+        if (master && ctx) {
+          master.gain.cancelScheduledValues(ctx.currentTime);
+          master.gain.setTargetAtTime(muted ? 0 : 0.22, ctx.currentTime, 0.025);
+        }
+        showStatus(muted ? "Sounds off" : "Sounds on");
+      });
+
+      songButton.addEventListener("click", function () {
+        if (tuneRunning) return;
+        initAudio();
+        songMode = !songMode;
+        songButton.setAttribute("aria-pressed", String(songMode));
+        songButton.setAttribute("aria-label", songMode ? "Turn follow the lights song mode off" : "Turn follow the lights song mode on");
+        tuneButton.disabled = songMode;
+        clearGuide();
+        if (songMode) {
+          songStep = 0;
+          showNextGuide();
+        }
+        showStatus(songMode ? "Follow the lights" : "Song mode off");
+      });
+
+      tuneButton.addEventListener("click", function () {
+        if (tuneRunning || songMode) return;
+        initAudio();
+        tuneRunning = true;
+        tuneButton.disabled = true;
+        songButton.disabled = true;
+        songMelody.forEach(function (padIndex, step) {
+          window.setTimeout(function () { hitPad(pads[padIndex]); }, step * 280);
+        });
+        window.setTimeout(function () {
+          tuneRunning = false;
+          tuneButton.disabled = false;
+          songButton.disabled = false;
+        }, songMelody.length * 280 + 100);
+      });
+    }());
+  </script>
+</body>
+</html>
