@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <link rel="icon" href="data:," />
+  <title>Bouncy Tabs</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800&display=swap');
+    :root{
+      color-scheme:light dark;
+      --ink:#18314d;
+      --muted:#526880;
+      --page:#bdefff;
+      --panel:#f8fdff;
+      --rail:#ffffff;
+      --shadow:rgba(29,75,112,.18);
+      --line:rgba(24,49,77,.1);
+      --yellow:#ffd84d;
+      --pink:#ff6f91;
+      --green:#67d486;
+      --blue:#5cb9ff;
+      --orange:#ff9b50;
+      --sky1:#bdefff;
+      --sky2:#f4fbff;
+    }
+    @media (prefers-color-scheme:dark){
+      :root{
+        --ink:#f4fbff;
+        --muted:#c7d6e5;
+        --page:#102942;
+        --panel:#173852;
+        --rail:#21465f;
+        --shadow:rgba(0,0,0,.28);
+        --line:rgba(255,255,255,.1);
+        --sky1:#183e5b;
+        --sky2:#102942;
+      }
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;overflow-x:hidden}
+    body{
+      min-height:100svh;
+      font-family:"Nunito",sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at 12% 12%,rgba(255,255,255,.75) 0 2px,transparent 3px),
+        radial-gradient(circle at 86% 18%,rgba(255,255,255,.55) 0 3px,transparent 4px),
+        linear-gradient(155deg,var(--sky1),var(--sky2));
+      background-size:72px 72px,105px 105px,auto;
+      overscroll-behavior:none;
+      -webkit-tap-highlight-color:transparent;
+    }
+    button{font:inherit;color:inherit}
+    .app{
+      width:min(100%,760px);
+      min-height:100svh;
+      margin:auto;
+      display:grid;
+      grid-template-rows:auto 1fr auto;
+      gap:12px;
+      padding:clamp(16px,4vw,28px) clamp(12px,3vw,22px) max(14px,env(safe-area-inset-bottom));
+    }
+    .intro{text-align:center;position:relative;z-index:2}
+    .intro h1{
+      font-family:"Baloo 2",sans-serif;
+      font-size:clamp(28px,7vw,44px);
+      line-height:1;
+      letter-spacing:-.02em;
+      margin:2px 0 4px;
+    }
+    .intro p{margin:0;color:var(--muted);font-size:clamp(15px,3.8vw,19px);font-weight:800}
+    .stage{
+      position:relative;
+      min-height:320px;
+      overflow:hidden;
+      border-radius:40px 40px 28px 28px;
+      background:var(--panel);
+      box-shadow:0 16px 44px var(--shadow),inset 0 0 0 2px rgba(255,255,255,.35);
+      isolation:isolate;
+    }
+    .scene{
+      position:absolute;inset:0;
+      display:grid;place-items:center;
+      opacity:0;transform:scale(.92);
+      pointer-events:none;
+      transition:opacity .25s ease,transform .55s cubic-bezier(.17,.89,.32,1.35);
+    }
+    .scene.active{opacity:1;transform:scale(1);pointer-events:auto}
+    .scene[hidden]{display:none}
+    .scene-bg{position:absolute;inset:0;overflow:hidden;z-index:-1}
+    .scene-copy{position:absolute;top:22px;left:18px;right:18px;text-align:center}
+    .scene-copy strong{display:block;font-family:"Baloo 2";font-size:clamp(25px,6vw,38px);line-height:1.05}
+    .scene-copy span{font-weight:800;color:var(--muted);font-size:15px}
+    .art{width:min(68vw,330px);margin-top:54px;filter:drop-shadow(0 12px 4px rgba(29,75,112,.12))}
+    .rocket-bg{background:linear-gradient(#8fdcff 0 62%,#dff9ff 62%)}
+    .dino-bg{background:linear-gradient(#c7f5a9 0 65%,#8edb83 65%)}
+    .music-bg{background:linear-gradient(#ffe3ef 0 66%,#ffc7dd 66%)}
+    .bubble-bg{background:linear-gradient(#c7f3ff,#e9fbff)}
+    .star-bg{background:linear-gradient(#183b72,#3b4a94)}
+    .cloud{position:absolute;background:#fff;border-radius:999px;opacity:.86}
+    .cloud:before,.cloud:after{content:"";position:absolute;background:inherit;border-radius:50%}
+    .c1{width:100px;height:26px;left:-8px;top:34%}.c1:before{width:42px;height:42px;left:18px;bottom:0}.c1:after{width:52px;height:52px;left:45px;bottom:0}
+    .c2{width:110px;height:24px;right:-18px;top:25%}.c2:before{width:44px;height:44px;left:12px;bottom:0}.c2:after{width:58px;height:58px;left:44px;bottom:0}
+    .hill{position:absolute;width:75%;height:42%;border-radius:50% 50% 0 0;bottom:-22%;background:rgba(74,181,103,.55)}
+    .hill.a{left:-17%;transform:rotate(7deg)}.hill.b{right:-22%;background:rgba(51,162,84,.48);transform:rotate(-8deg)}
+    .dot{position:absolute;border-radius:50%;background:rgba(255,255,255,.85)}
+    .star-speck{position:absolute;width:4px;height:4px;border-radius:50%;background:#fff;box-shadow:0 0 8px #fff}
+    .tap-art{
+      border:0;background:transparent;padding:0;cursor:pointer;
+      width:min(70vw,340px);aspect-ratio:1;display:grid;place-items:center;
+      margin-top:48px;touch-action:manipulation;
+    }
+    .tap-art svg{width:100%;height:100%;overflow:visible}
+    .tap-art:active{transform:scale(.96)}
+    .tap-art:focus-visible{outline:5px solid var(--blue);outline-offset:4px;border-radius:50%}
+    .stage.boop .active .art,.stage.boop .active .tap-art svg{animation:boop .62s cubic-bezier(.22,1.6,.45,1)}
+    @keyframes boop{0%{transform:scale(1)}35%{transform:scale(.82) rotate(-4deg)}72%{transform:scale(1.12) rotate(3deg)}100%{transform:scale(1)}}
+    .rocket-flame{transform-origin:160px 264px;animation:flame .22s ease-in-out infinite alternate}
+    @keyframes flame{to{transform:scaleY(.72)}}
+    .dino-tail{transform-origin:88px 208px;animation:tail 1.2s ease-in-out infinite alternate}
+    @keyframes tail{to{transform:rotate(-7deg)}}
+    .music-note{animation:float 1.4s ease-in-out infinite alternate}
+    .music-note.n2{animation-delay:.45s}.music-note.n3{animation-delay:.8s}
+    @keyframes float{to{transform:translateY(-10px) rotate(6deg)}}
+    .bubble{position:absolute;border:3px solid rgba(58,169,217,.42);background:rgba(255,255,255,.28);border-radius:50%;animation:bubbleUp 4s linear infinite}
+    @keyframes bubbleUp{from{transform:translateY(90px) scale(.7);opacity:0}15%{opacity:1}to{transform:translateY(-360px) scale(1.1);opacity:0}}
+    .moonfloat{animation:moonfloat 2s ease-in-out infinite alternate;transform-origin:center}
+    @keyframes moonfloat{to{transform:translateY(-8px) rotate(3deg)}}
+    .rail-wrap{position:relative;padding-top:13px}
+    .rail{
+      position:relative;
+      height:clamp(82px,20vw,104px);
+      display:grid;grid-template-columns:repeat(5,1fr);align-items:center;
+      background:var(--rail);
+      border-radius:28px;
+      box-shadow:0 12px 30px var(--shadow);
+      padding:10px 7px 7px;
+      border:1px solid var(--line);
+    }
+    .indicator{
+      --x:0px;
+      position:absolute;
+      top:-12px;left:0;
+      width:clamp(60px,16vw,82px);height:clamp(60px,16vw,82px);
+      border-radius:50%;
+      background:var(--yellow);
+      transform:translateX(var(--x));
+      box-shadow:0 7px 0 rgba(24,49,77,.12),0 12px 22px var(--shadow);
+      z-index:0;
+      will-change:transform;
+    }
+    .indicator:after{
+      content:"";position:absolute;width:18%;height:10%;border-radius:50%;
+      background:rgba(255,255,255,.65);top:16%;left:23%;transform:rotate(-20deg)
+    }
+    .tab{
+      align-self:stretch;min-width:0;
+      border:0;background:transparent;border-radius:22px;
+      padding:8px 2px 2px;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+      cursor:pointer;position:relative;z-index:1;touch-action:manipulation;
+    }
+    .tab svg{width:clamp(30px,8vw,41px);height:clamp(30px,8vw,41px);transition:transform .45s cubic-bezier(.2,1.6,.3,1)}
+    .tab span{font-size:clamp(10px,2.7vw,13px);font-weight:900;line-height:1;transition:opacity .2s,transform .3s;color:var(--muted)}
+    .tab.active svg{transform:translateY(-14px) scale(1.18)}
+    .tab.active span{opacity:0;transform:translateY(5px)}
+    .tab:focus-visible{outline:4px solid var(--blue);outline-offset:-4px}
+    .tab-pop{animation:tabpop .6s cubic-bezier(.18,1.7,.42,1)}
+    @keyframes tabpop{0%{transform:translateY(-14px) scale(1.18)}40%{transform:translateY(-23px) scale(1.32) rotate(-8deg)}100%{transform:translateY(-14px) scale(1.18)}}
+    .particle{position:fixed;z-index:20;pointer-events:none;width:12px;height:12px;border-radius:50%;animation:burst .75s ease-out forwards}
+    @keyframes burst{to{transform:translate(var(--dx),var(--dy)) rotate(250deg) scale(.2);opacity:0}}
+    .sound-tip{position:absolute;right:14px;bottom:13px;font-size:12px;font-weight:900;color:var(--muted);opacity:.72}
+    @media (max-height:620px){
+      .app{gap:8px;padding-top:10px}.intro h1{font-size:27px}.intro p{font-size:14px}
+      .stage{min-height:260px}.scene-copy{top:12px}.scene-copy strong{font-size:26px}.art,.tap-art{width:220px;margin-top:40px}
+      .rail{height:78px}.indicator{width:58px;height:58px}.tab svg{width:30px;height:30px}.tab.active svg{transform:translateY(-11px) scale(1.12)}
+    }
+    @media (min-width:760px){.app{padding-top:24px;padding-bottom:22px}.stage{min-height:430px}}
+    @media (prefers-reduced-motion:reduce){
+      *,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}
+    }
+  </style>
+</head>
+<body>
+<main class="app">
+  <div class="intro">
+    <h1 id="title">Ready, set… zoom!</h1>
+    <p id="hint">Tap the rocket for a surprise</p>
+  </div>
+
+  <section class="stage" id="stage" aria-live="polite">
+    <div class="scene active" data-scene="rocket">
+      <div class="scene-bg rocket-bg"><i class="cloud c1"></i><i class="cloud c2"></i></div>
+      <div class="scene-copy"><strong>Rocket ride!</strong><span>Tap to blast off</span></div>
+      <button class="tap-art" aria-label="Blast off the rocket" data-boop="rocket">
+        <svg viewBox="0 0 320 320" role="img" aria-label="A happy red rocket">
+          <g class="art">
+            <path d="M120 229 91 260l43-3 13-31Z" fill="#ff6b5e" stroke="#18314d" stroke-width="8" stroke-linejoin="round"/>
+            <path d="m200 229 29 31-43-3-13-31Z" fill="#ff6b5e" stroke="#18314d" stroke-width="8" stroke-linejoin="round"/>
+            <path class="rocket-flame" d="M141 244q19 66 38 0l-7-18h-24Z" fill="#ffd84d" stroke="#18314d" stroke-width="8" stroke-linejoin="round"/>
+            <path d="M160 47c-51 40-58 119-26 191h52c32-72 25-151-26-191Z" fill="#fff" stroke="#18314d" stroke-width="9" stroke-linejoin="round"/>
+            <path d="M160 47c-20 16-34 37-42 61h84c-8-24-22-45-42-61Z" fill="#ff6b5e" stroke="#18314d" stroke-width="8" stroke-linejoin="round"/>
+            <circle cx="160" cy="146" r="29" fill="#79d5ff" stroke="#18314d" stroke-width="8"/>
+            <circle cx="151" cy="137" r="7" fill="#fff"/>
+            <path d="M148 191q12 12 24 0" fill="none" stroke="#18314d" stroke-width="7" stroke-linecap="round"/>
+          </g>
+        </svg>
+      </button>
+    </div>
+
+    <div class="scene" data-scene="dino" hidden>
+      <div class="scene-bg dino-bg"><i class="hill a"></i><i class="hill b"></i></div>
+      <div class="scene-copy"><strong>Dino stomp!</strong><span>Tap for a giant ROAR</span></div>
+      <button class="tap-art" aria-label="Make the dinosaur stomp" data-boop="dino">
+        <svg viewBox="0 0 320 320" role="img" aria-label="A friendly green dinosaur">
+          <g class="art">
+            <path class="dino-tail" d="M101 207Q48 190 35 231q39-16 78 14Z" fill="#4fbd74" stroke="#18314d" stroke-width="8" stroke-linejoin="round"/>
+            <path d="M103 108q-18 34-12 96 3 43 37 50h77q37-9 32-50l-8-82q-4-54-57-60-48-5-69 46Z" fill="#67d486" stroke="#18314d" stroke-width="9"/>
+            <path d="m115 93-16-28 33 9m23-11 7-32 21 32m24 8 28-19-7 32" fill="#ffd84d" stroke="#18314d" stroke-width="7" stroke-linejoin="round"/>
+            <circle cx="144" cy="118" r="9" fill="#18314d"/><circle cx="199" cy="118" r="9" fill="#18314d"/>
+            <circle cx="141" cy="114" r="3" fill="#fff"/><circle cx="196" cy="114" r="3" fill="#fff"/>
+            <path d="M151 151q20 18 40 0" fill="none" stroke="#18314d" stroke-width="7" stroke-linecap="round"/>
+            <path d="M123 251v25m83-25v25" stroke="#18314d" stroke-width="17" stroke-linecap="round"/>
+            <path d="M113 275h28m55 0h28" stroke="#ff9b50" stroke-width="13" stroke-linecap="round"/>
+            <circle cx="115" cy="160" r="9" fill="#47b366"/><circle cx="211" cy="173" r="8" fill="#47b366"/>
+          </g>
+        </svg>
+      </button>
+    </div>
+
+    <div class="scene" data-scene="music" hidden>
+      <div class="scene-bg music-bg"></div>
+      <div class="scene-copy"><strong>Dance party!</strong><span>Tap the drum for a beat</span></div>
+      <button class="tap-art" aria-label="Play the drum" data-boop="music">
+        <svg viewBox="0 0 320 320" role="img" aria-label="A colorful toy drum">
+          <g class="music-note" fill="#5a8dee" stroke="#18314d" stroke-width="6"><path d="M70 104v-44l31-8v43" fill="none"/><circle cx="63" cy="107" r="12"/><circle cx="94" cy="98" r="12"/></g>
+          <g class="music-note n2" fill="#ff789b" stroke="#18314d" stroke-width="6"><path d="M240 113V69l25-6" fill="none"/><circle cx="233" cy="117" r="12"/></g>
+          <g class="art">
+            <path d="M86 143h148l-15 115H101Z" fill="#ff6f91" stroke="#18314d" stroke-width="9" stroke-linejoin="round"/>
+            <ellipse cx="160" cy="143" rx="74" ry="28" fill="#ffd84d" stroke="#18314d" stroke-width="9"/>
+            <path d="m112 169 94 69m-92 0 92-69" stroke="#fff" stroke-width="8" stroke-linecap="round" opacity=".9"/>
+            <path d="m74 107 70 79m102-79-70 79" stroke="#18314d" stroke-width="9" stroke-linecap="round"/>
+            <circle cx="72" cy="104" r="15" fill="#67d486" stroke="#18314d" stroke-width="7"/><circle cx="248" cy="104" r="15" fill="#5cb9ff" stroke="#18314d" stroke-width="7"/>
+          </g>
+        </svg>
+      </button>
+    </div>
+
+    <div class="scene" data-scene="bubble" hidden>
+      <div class="scene-bg bubble-bg" id="bubbleBg"></div>
+      <div class="scene-copy"><strong>Bubble pop!</strong><span>Tap to make bubbles</span></div>
+      <button class="tap-art" aria-label="Make bubbles" data-boop="bubble">
+        <svg viewBox="0 0 320 320" role="img" aria-label="A smiling blue bubble">
+          <g class="art">
+            <circle cx="160" cy="171" r="93" fill="#80dcff" fill-opacity=".65" stroke="#18314d" stroke-width="9"/>
+            <path d="M103 128q16-28 45-35" fill="none" stroke="#fff" stroke-width="14" stroke-linecap="round" opacity=".8"/>
+            <circle cx="130" cy="171" r="9" fill="#18314d"/><circle cx="190" cy="171" r="9" fill="#18314d"/>
+            <path d="M136 204q24 20 48 0" fill="none" stroke="#18314d" stroke-width="8" stroke-linecap="round"/>
+            <circle cx="72" cy="104" r="28" fill="#fff" fill-opacity=".35" stroke="#5cb9ff" stroke-width="6"/>
+            <circle cx="251" cy="85" r="20" fill="#fff" fill-opacity=".35" stroke="#ff6f91" stroke-width="6"/>
+          </g>
+        </svg>
+      </button>
+    </div>
+
+    <div class="scene" data-scene="star" hidden>
+      <div class="scene-bg star-bg">
+        <i class="star-speck" style="left:12%;top:30%"></i><i class="star-speck" style="left:24%;top:58%"></i><i class="star-speck" style="left:75%;top:34%"></i><i class="star-speck" style="left:88%;top:62%"></i><i class="star-speck" style="left:60%;top:24%"></i>
+      </div>
+      <div class="scene-copy" style="color:#fff"><strong>Twinkle time!</strong><span style="color:#dbe8ff">Tap to sparkle</span></div>
+      <button class="tap-art" aria-label="Make the star sparkle" data-boop="star">
+        <svg viewBox="0 0 320 320" role="img" aria-label="A sleepy golden star">
+          <g class="moonfloat art">
+            <path d="m160 60 29 60 66 10-48 46 11 66-58-31-58 31 11-66-48-46 66-10Z" fill="#ffd84d" stroke="#f5f7ff" stroke-width="9" stroke-linejoin="round"/>
+            <path d="M125 154q12 12 24 0m22 0q12 12 24 0" fill="none" stroke="#18314d" stroke-width="8" stroke-linecap="round"/>
+            <path d="M143 184q17 13 34 0" fill="none" stroke="#18314d" stroke-width="7" stroke-linecap="round"/>
+            <circle cx="105" cy="181" r="10" fill="#ff9b74" opacity=".7"/><circle cx="215" cy="181" r="10" fill="#ff9b74" opacity=".7"/>
+          </g>
+        </svg>
+      </button>
+    </div>
+    <span class="sound-tip">Sound on after a tap</span>
+  </section>
+
+  <nav class="rail-wrap" aria-label="Pick a play scene">
+    <div class="rail" id="rail">
+      <div class="indicator" id="indicator" aria-hidden="true"></div>
+      <button class="tab active" data-tab="rocket" aria-label="Rocket" aria-pressed="true">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M25 5C14 14 14 29 20 36h9c6-10 5-23-4-31Z" fill="#fff" stroke="#18314d" stroke-width="3"/><circle cx="24.5" cy="20" r="5" fill="#5cb9ff" stroke="#18314d" stroke-width="3"/><path d="m18 30-7 8 9-1m10-7 7 8-9-1m-6 0q2 9 5 0" fill="#ff6b5e" stroke="#18314d" stroke-width="3" stroke-linejoin="round"/></svg><span>Rocket</span>
+      </button>
+      <button class="tab" data-tab="dino" aria-label="Dinosaur" aria-pressed="false">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M12 25q-7 3-7 10 7-4 13-1m-4-13q2-12 13-12 12 0 12 13v14H17q-7-4-3-15Z" fill="#67d486" stroke="#18314d" stroke-width="3"/><circle cx="29" cy="17" r="2.5" fill="#18314d"/><path d="M29 25q4 3 8 0M20 36v6m12-6v6" fill="none" stroke="#18314d" stroke-width="3" stroke-linecap="round"/></svg><span>Dino</span>
+      </button>
+      <button class="tab" data-tab="music" aria-label="Music" aria-pressed="false">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><ellipse cx="24" cy="18" rx="14" ry="6" fill="#ffd84d" stroke="#18314d" stroke-width="3"/><path d="M10 18h28l-3 22H13Z" fill="#ff6f91" stroke="#18314d" stroke-width="3" stroke-linejoin="round"/><path d="m16 23 16 13m0-13L16 36" stroke="#fff" stroke-width="2.5"/></svg><span>Music</span>
+      </button>
+      <button class="tab" data-tab="bubble" aria-label="Bubbles" aria-pressed="false">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="23" cy="27" r="14" fill="#80dcff" fill-opacity=".7" stroke="#18314d" stroke-width="3"/><circle cx="37" cy="12" r="6" fill="#fff" fill-opacity=".5" stroke="#5cb9ff" stroke-width="2.5"/><path d="M15 22q3-6 8-7" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/></svg><span>Bubbles</span>
+      </button>
+      <button class="tab" data-tab="star" aria-label="Stars" aria-pressed="false">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path d="m24 5 6 12 13 2-10 9 3 13-12-6-12 6 3-13-10-9 13-2Z" fill="#ffd84d" stroke="#18314d" stroke-width="3" stroke-linejoin="round"/><path d="M18 24q3 3 6 0m2 0q3 3 6 0" fill="none" stroke="#18314d" stroke-width="2.5" stroke-linecap="round"/></svg><span>Stars</span>
+      </button>
+    </div>
+  </nav>
+</main>
+<script>
+(function(){
+  var tabs=Array.prototype.slice.call(document.querySelectorAll('.tab'));
+  var scenes=Array.prototype.slice.call(document.querySelectorAll('.scene'));
+  var indicator=document.getElementById('indicator');
+  var rail=document.getElementById('rail');
+  var stage=document.getElementById('stage');
+  var title=document.getElementById('title');
+  var hint=document.getElementById('hint');
+  var selected=0,x=0,v=0,target=0,running=false,audio=null;
+  var colors=['#ffd84d','#67d486','#ff6f91','#5cb9ff','#ffd84d'];
+  var copy=[
+    ['Ready, set… zoom!','Tap the rocket for a surprise'],
+    ['Stomp, stomp, ROAR!','Tap the dino to make him dance'],
+    ['Let’s make some noise!','Tap the drum to play a beat'],
+    ['Pop-pop-pop!','Tap the bubble to make more'],
+    ['Shine, little star!','Tap the star for sparkles']
+  ];
+  function measure(){
+    var tab=tabs[selected],rr=rail.getBoundingClientRect(),tr=tab.getBoundingClientRect(),ir=indicator.getBoundingClientRect();
+    target=tr.left-rr.left+(tr.width-ir.width)/2;
+    if(!running){x=target;indicator.style.setProperty('--x',x+'px')}
+  }
+  function animate(){
+    var force=(target-x)*.13;v=(v+force)*.72;x+=v;
+    indicator.style.setProperty('--x',x+'px');
+    if(Math.abs(target-x)>.1||Math.abs(v)>.1){requestAnimationFrame(animate)}else{x=target;v=0;running=false;indicator.style.setProperty('--x',x+'px')}
+  }
+  function spring(){if(!running){running=true;requestAnimationFrame(animate)}}
+  function tone(kind){
+    try{
+      audio=audio||new (window.AudioContext||window.webkitAudioContext)();
+      if(audio.state==='suspended')audio.resume();
+      var now=audio.currentTime,notes={rocket:[330,520,780],dino:[105,82],music:[262,330,392,523],bubble:[680,880],star:[523,659,784]}[kind];
+      notes.forEach(function(freq,i){
+        var o=audio.createOscillator(),g=audio.createGain();o.type=kind==='dino'?'sawtooth':'sine';o.frequency.setValueAtTime(freq,now+i*.09);
+        if(kind==='rocket')o.frequency.exponentialRampToValueAtTime(freq*1.45,now+i*.09+.18);
+        g.gain.setValueAtTime(.0001,now+i*.09);g.gain.exponentialRampToValueAtTime(.11,now+i*.09+.015);g.gain.exponentialRampToValueAtTime(.0001,now+i*.09+.22);
+        o.connect(g);g.connect(audio.destination);o.start(now+i*.09);o.stop(now+i*.09+.24);
+      });
+    }catch(e){}
+  }
+  function burstAt(el,kind,count){
+    var r=el.getBoundingClientRect(),palette=['#ffd84d','#ff6f91','#67d486','#5cb9ff','#ff9b50'];
+    for(var i=0;i<(count||9);i++){
+      var p=document.createElement('i'),a=(Math.PI*2*i/(count||9))+Math.random()*.35,d=45+Math.random()*55;
+      p.className='particle';p.style.left=(r.left+r.width/2-6)+'px';p.style.top=(r.top+r.height*.25)+'px';p.style.background=palette[(i+selected)%palette.length];
+      p.style.borderRadius=i%3===0?'2px':'50%';p.style.setProperty('--dx',Math.cos(a)*d+'px');p.style.setProperty('--dy',Math.sin(a)*d+'px');
+      document.body.appendChild(p);setTimeout(function(node){return function(){node.remove()}}(p),800);
+    }
+  }
+  function select(i,withSound){
+    selected=i;
+    tabs.forEach(function(t,n){t.classList.toggle('active',n===i);t.setAttribute('aria-pressed',n===i?'true':'false')});
+    scenes.forEach(function(s,n){
+      var on=n===i;
+      s.classList.toggle('active',on);
+      s.hidden=!on;
+    });
+    indicator.style.background=colors[i];title.textContent=copy[i][0];hint.textContent=copy[i][1];
+    measure();spring();
+    var svg=tabs[i].querySelector('svg');svg.classList.remove('tab-pop');void svg.offsetWidth;svg.classList.add('tab-pop');
+    burstAt(tabs[i],tabs[i].dataset.tab,7);if(withSound)tone(tabs[i].dataset.tab);
+  }
+  tabs.forEach(function(tab,i){tab.addEventListener('click',function(){select(i,true)})});
+  document.querySelectorAll('[data-boop]').forEach(function(btn){btn.addEventListener('click',function(){
+    var kind=btn.dataset.boop;stage.classList.remove('boop');void stage.offsetWidth;stage.classList.add('boop');tone(kind);burstAt(btn,kind,13);
+    if(kind==='bubble'){
+      var bg=document.getElementById('bubbleBg');for(var j=0;j<5;j++){var b=document.createElement('i');b.className='bubble';var size=18+Math.random()*40;b.style.width=size+'px';b.style.height=size+'px';b.style.left=(8+Math.random()*84)+'%';b.style.bottom='-60px';b.style.animationDelay=(Math.random()*.3)+'s';bg.appendChild(b);setTimeout(function(node){return function(){node.remove()}}(b),4700)}
+    }
+  })});
+  window.addEventListener('resize',measure);requestAnimationFrame(measure);
+})();
+</script>
+</body>
+</html>
