@@ -1,0 +1,779 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- pwa-tags -->
+<meta name="pwa-tags" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Space Bus">
+<meta name="theme-color" content="#1e1b4b">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="color-scheme" content="dark" />
+  <link rel="icon" href="data:," />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+  <title>Space Bus</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html, body { height:100%; overflow:hidden; }
+    body {
+      font-family:'Nunito',system-ui,sans-serif;
+      background:#070818;
+      color:#fff;
+      user-select:none; -webkit-user-select:none;
+      touch-action:manipulation;
+      position:fixed; inset:0; width:100%;
+    }
+    h1,h2,.big-label { font-family:'Fredoka','Nunito',sans-serif; }
+
+    /* ---------- starfield ---------- */
+    #stars { position:fixed; inset:0; z-index:0; pointer-events:none; }
+    .star-dot {
+      position:absolute; border-radius:50%; background:#fff;
+      animation:twinkle var(--tw,3s) ease-in-out infinite;
+    }
+    @keyframes twinkle { 0%,100%{opacity:.25; transform:scale(.8);} 50%{opacity:1; transform:scale(1.15);} }
+
+    /* ---------- scenes ---------- */
+    .scene {
+      position:fixed; inset:0; z-index:1;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      transition:opacity .45s ease, transform .45s ease;
+    }
+    .scene.hidden { opacity:0; pointer-events:none; transform:scale(1.06); }
+    .scene.hidden * { pointer-events:none !important; }
+
+    /* ---------- launchpad ---------- */
+    #scene-launch { background:linear-gradient(180deg,#0b1035 0%,#1b2358 55%,#2b1a4e 100%); }
+    .ground {
+      position:absolute; bottom:0; left:0; right:0; height:26%;
+      background:linear-gradient(180deg,#3f3a6e,#241f4d);
+      border-top:4px solid #565093;
+    }
+    .launch-title { font-size:clamp(34px,8vw,64px); font-weight:700; text-align:center; padding:0 20px; text-shadow:0 4px 24px rgba(139,92,246,.55); z-index:2; }
+    .launch-sub { margin-top:10px; font-size:clamp(16px,3.6vw,24px); font-weight:800; color:#c4b5fd; z-index:2; }
+    #bus-wrap { z-index:2; margin:26px 0 6px; transition:transform 1.4s cubic-bezier(.5,-0.1,.7,.4); }
+    #bus-wrap.liftoff { transform:translateY(-120vh); }
+    #bus { font-size:clamp(84px,20vw,150px); display:inline-block; filter:drop-shadow(0 10px 24px rgba(0,0,0,.5)); }
+    #bus-wrap.shake #bus { animation:busshake .12s linear infinite; }
+    @keyframes busshake { 0%{transform:translate(0,0) rotate(-1deg);} 50%{transform:translate(3px,-2px) rotate(1deg);} 100%{transform:translate(-3px,2px) rotate(-1deg);} }
+    .flame { font-size:clamp(40px,10vw,72px); text-align:center; opacity:0; transition:opacity .2s; animation:flick .18s linear infinite; }
+    #bus-wrap.shake .flame, #bus-wrap.liftoff .flame { opacity:1; }
+    @keyframes flick { 0%{transform:scaleY(1);} 50%{transform:scaleY(1.25) scaleX(.92);} 100%{transform:scaleY(.9);} }
+    #launch-btn {
+      z-index:3; margin-top:26px;
+      font-family:'Fredoka',sans-serif; font-weight:700;
+      font-size:clamp(26px,6vw,40px); color:#1e1b4b;
+      background:linear-gradient(180deg,#fde68a,#f59e0b);
+      border:none; border-radius:999px; padding:18px 58px;
+      box-shadow:0 8px 0 #b45309, 0 14px 30px rgba(245,158,11,.45);
+      cursor:pointer;
+    }
+    #launch-btn:active { transform:translateY(6px); box-shadow:0 2px 0 #b45309; }
+    #countdown {
+      position:fixed; inset:0; z-index:40; display:none;
+      align-items:center; justify-content:center;
+      font-family:'Fredoka',sans-serif; font-size:clamp(90px,24vw,200px); font-weight:700;
+      color:#fde68a; text-shadow:0 0 60px rgba(245,158,11,.8); pointer-events:none;
+    }
+    #countdown.show { display:flex; }
+    #countdown.pop { animation:countpop .9s ease; }
+    @keyframes countpop { 0%{transform:scale(.4); opacity:0;} 25%{transform:scale(1.15); opacity:1;} 80%{transform:scale(1);} 100%{transform:scale(1.3); opacity:0;} }
+
+    /* ---------- map scene ---------- */
+    #scene-map { background:radial-gradient(120% 90% at 50% 110%, #1e1b4b 0%, #0b1035 55%, #05061a 100%); }
+    #map-title { position:absolute; top:max(14px, env(safe-area-inset-top)); font-size:clamp(22px,5vw,34px); font-weight:700; color:#e0e7ff; text-shadow:0 2px 18px rgba(99,102,241,.6); z-index:5; }
+    #map-hint { position:absolute; top:calc(max(14px, env(safe-area-inset-top)) + clamp(30px,7vw,46px)); font-size:clamp(14px,3.4vw,20px); font-weight:800; color:#a5b4fc; z-index:5; }
+    #sun {
+      position:absolute; top:50%; left:50%; margin:-75px 0 0 -75px;
+      width:150px; height:150px; border-radius:50%;
+      background:radial-gradient(circle at 38% 35%, #fef3c7, #fbbf24 55%, #f97316 100%);
+      box-shadow:0 0 60px 18px rgba(251,191,36,.55), 0 0 140px 40px rgba(249,115,22,.25);
+      animation:sunpulse 4s ease-in-out infinite; cursor:pointer; z-index:2;
+    }
+    @keyframes sunpulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.06);} }
+    #orbits { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:2; }
+    .planet-btn {
+      position:absolute; border:none; background:none; cursor:pointer;
+      display:flex; flex-direction:column; align-items:center; gap:6px;
+      padding:14px; border-radius:24px;
+      transition:transform .18s ease;
+      z-index:3;
+    }
+    .planet-btn:active { transform:scale(1.18); }
+    .planet-ball { border-radius:50%; box-shadow:inset -10px -12px 24px rgba(0,0,0,.45), 0 0 22px rgba(255,255,255,.12); position:relative; }
+    .planet-btn.visited .planet-ball::after {
+      content:'✓'; position:absolute; top:-8px; right:-8px; width:30px; height:30px;
+      background:#22c55e; border-radius:50%; font-size:18px; line-height:30px; text-align:center; color:#fff;
+      box-shadow:0 2px 8px rgba(0,0,0,.4);
+    }
+    .planet-name { font-weight:900; font-size:clamp(13px,3.2vw,18px); color:#e0e7ff; text-shadow:0 2px 8px #000; white-space:nowrap; }
+    .saturn-ring {
+      position:absolute; top:50%; left:50%; width:170%; height:64%;
+      border:7px solid rgba(242,221,171,.85); border-radius:50%;
+      transform:translate(-50%,-50%) rotate(-18deg); pointer-events:none;
+      box-shadow:0 0 10px rgba(242,221,171,.4);
+    }
+
+    /* ---------- planet scene ---------- */
+    #scene-planet { background:radial-gradient(120% 90% at 50% 110%, #141641 0%, #0a0c2c 60%, #040518 100%); }
+    #planet-title { position:absolute; top:max(14px, env(safe-area-inset-top)); font-size:clamp(26px,6vw,40px); font-weight:700; color:#fff; text-shadow:0 2px 20px rgba(139,92,246,.7); z-index:5; }
+    #planet-stage { position:relative; width:min(78vw,340px); height:min(78vw,340px); z-index:2; }
+    #planet-big {
+      width:100%; height:100%; border-radius:50%; cursor:pointer;
+      box-shadow:inset -22px -26px 60px rgba(0,0,0,.5), 0 0 50px rgba(255,255,255,.1);
+      transition:transform .2s;
+    }
+    #planet-big:active { transform:scale(1.05); }
+    #planet-big.wobble { animation:wobble .5s ease; }
+    @keyframes wobble { 0%,100%{transform:rotate(0);} 25%{transform:rotate(-4deg) scale(1.03);} 75%{transform:rotate(4deg) scale(1.03);} }
+    #hotspots { position:absolute; inset:0; z-index:4; pointer-events:none; }
+    .hotspot {
+      position:absolute; pointer-events:auto; cursor:pointer;
+      width:clamp(72px,17vw,96px); height:clamp(72px,17vw,96px); border-radius:50%;
+      background:rgba(255,255,255,.14); border:3px solid rgba(255,255,255,.5);
+      backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+      font-size:clamp(34px,8vw,48px);
+      display:flex; align-items:center; justify-content:center;
+      box-shadow:0 4px 18px rgba(0,0,0,.4);
+      animation:bob 2.6s ease-in-out infinite;
+      transition:transform .15s;
+    }
+    .hotspot:active { transform:scale(1.25); }
+    @keyframes bob { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-9px);} }
+    #fact-bubble {
+      position:absolute; bottom:calc(max(18px, env(safe-area-inset-bottom)) + 92px); left:50%; transform:translateX(-50%) translateY(20px);
+      width:min(88vw,480px); background:rgba(255,255,255,.96); color:#1e1b4b;
+      border-radius:22px; padding:16px 20px; font-weight:800; font-size:clamp(16px,4vw,21px); text-align:center;
+      opacity:0; transition:opacity .3s, transform .3s; z-index:6; pointer-events:none;
+      box-shadow:0 10px 30px rgba(0,0,0,.45);
+    }
+    #fact-bubble.show { opacity:1; transform:translateX(-50%) translateY(0); }
+    #back-btn {
+      position:absolute; bottom:max(20px, env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%);
+      font-family:'Fredoka',sans-serif; font-weight:600; font-size:clamp(19px,4.6vw,26px); color:#fff;
+      background:linear-gradient(180deg,#8b5cf6,#6d28d9); border:none; border-radius:999px; padding:14px 34px;
+      box-shadow:0 6px 0 #4c1d95, 0 10px 24px rgba(139,92,246,.4); cursor:pointer; z-index:5; white-space:nowrap;
+    }
+    #back-btn:active { transform:translateX(-50%) translateY(5px); box-shadow:0 1px 0 #4c1d95; }
+
+    /* ---------- HUD ---------- */
+    #hud { position:fixed; top:0; left:0; right:0; z-index:30; display:flex; justify-content:space-between; align-items:flex-start; padding:max(12px, env(safe-area-inset-top)) 14px 0; pointer-events:none; }
+    #hud > * { pointer-events:auto; }
+    #star-count {
+      background:rgba(0,0,0,.45); border:2px solid rgba(253,224,71,.6); border-radius:999px;
+      padding:8px 18px; font-weight:900; font-size:clamp(17px,4.4vw,22px); color:#fde68a;
+    }
+    #sound-btn {
+      background:rgba(0,0,0,.45); border:2px solid rgba(255,255,255,.35); border-radius:50%;
+      width:52px; height:52px; font-size:26px; cursor:pointer; color:#fff;
+    }
+    .collect-star {
+      position:fixed; z-index:25; font-size:clamp(30px,7vw,44px); cursor:pointer;
+      animation:starbob 2.2s ease-in-out infinite; filter:drop-shadow(0 0 10px #fde68a);
+      transition:transform .15s, opacity .3s;
+    }
+    @keyframes starbob { 0%,100%{transform:translateY(0) rotate(-8deg);} 50%{transform:translateY(-10px) rotate(8deg);} }
+    .collect-star.caught { transform:scale(2.2); opacity:0; pointer-events:none; }
+
+    /* ---------- fx layers ---------- */
+    #fx-layer { position:fixed; inset:0; z-index:35; pointer-events:none; overflow:hidden; }
+    .fx-flash { position:absolute; inset:0; animation:fxflash .5s ease forwards; }
+    @keyframes fxflash { 0%{opacity:0;} 30%{opacity:.85;} 100%{opacity:0;} }
+    .fx-particle { position:absolute; font-size:34px; animation:fxburst 1s ease-out forwards; }
+    @keyframes fxburst {
+      0%{ transform:translate(-50%,-50%) scale(.4); opacity:1; }
+      100%{ transform:translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.3); opacity:0; }
+    }
+    .fx-fall { position:absolute; top:-60px; font-size:38px; animation:fxfall 1.6s ease-in forwards; }
+    @keyframes fxfall { to { transform:translateY(110vh) rotate(340deg); } }
+    .fx-ring {
+      position:absolute; left:50%; top:50%; width:60px; height:60px; border-radius:50%;
+      border:6px solid #fff; transform:translate(-50%,-50%);
+      animation:fxring .8s ease-out forwards;
+    }
+    @keyframes fxring { to { width:340px; height:340px; opacity:0; } }
+
+    /* ---------- fact card ---------- */
+    #card-scrim { position:fixed; inset:0; z-index:36; background:rgba(4,6,24,.62); opacity:0; pointer-events:none; transition:opacity .25s; }
+    #card-scrim.show { opacity:1; pointer-events:auto; }
+    #fact-card {
+      position:fixed; left:50%; top:50%; z-index:37; width:min(88vw,420px);
+      transform:translate(-50%,-50%) scale(.7); opacity:0; pointer-events:none;
+      background:linear-gradient(180deg,#ffffff,#eef2ff); color:#1e1b4b; border-radius:28px;
+      padding:24px 22px 20px; text-align:center; box-shadow:0 24px 70px rgba(0,0,0,.55);
+      transition:transform .28s cubic-bezier(.34,1.56,.64,1), opacity .2s;
+    }
+    #fact-card.show { transform:translate(-50%,-50%) scale(1); opacity:1; pointer-events:auto; }
+    #fact-viz { min-height:120px; display:flex; flex-direction:column; align-items:center; justify-content:center; margin-bottom:12px; }
+    .viz-big { font-size:84px; animation:bob 2s ease-in-out infinite; }
+    .viz-meter { position:relative; width:100%; height:34px; background:#e2e8f0; border-radius:999px; margin:14px 0 4px; }
+    .viz-meter-fill { height:100%; border-radius:999px; }
+    .viz-meter-emoji { position:absolute; right:-6px; top:-18px; font-size:36px; }
+    .viz-scale { display:flex; justify-content:space-between; font-weight:900; font-size:14px; color:#64748b; padding:0 4px; }
+    .viz-circles { display:flex; align-items:flex-end; justify-content:center; gap:26px; }
+    .viz-cw { display:flex; flex-direction:column; align-items:center; gap:6px; }
+    .viz-c { border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:inset -6px -8px 16px rgba(0,0,0,.3); }
+    .viz-cl { font-weight:900; font-size:15px; color:#475569; }
+    .viz-dots { font-size:32px; line-height:1.55; max-width:290px; }
+    .viz-dots span { display:inline-block; animation:bob 2.4s ease-in-out infinite; }
+    .viz-dots span:nth-child(even) { animation-delay:.6s; }
+    #fact-text { font-weight:800; font-size:clamp(17px,4.4vw,21px); line-height:1.45; margin-bottom:16px; }
+    #fact-ok {
+      font-family:'Fredoka',sans-serif; font-weight:700; font-size:22px; color:#fff;
+      background:linear-gradient(180deg,#22c55e,#16a34a); border:none; border-radius:999px; padding:14px 44px;
+      box-shadow:0 5px 0 #15803d; cursor:pointer;
+    }
+    #fact-ok:active { transform:translateY(4px); box-shadow:0 1px 0 #15803d; }
+
+    /* ---------- cartoon MSB bits ---------- */
+    #bus svg { width:clamp(160px,42vw,250px); height:auto; filter:drop-shadow(0 10px 24px rgba(0,0,0,.5)); }
+    #bus-wrap.shake #bus svg { animation:busshake .12s linear infinite; }
+    #fly-bus svg { width:76px; height:auto; }
+    .msb-badge { position:relative; z-index:2; text-align:center; padding:6px 34px 14px; margin-bottom:4px; }
+    .msb-burst {
+      position:absolute; inset:-14px -30px; z-index:-1;
+      background:#f59e0b;
+      clip-path:polygon(50% 0%,61% 12%,75% 6%,80% 20%,95% 20%,93% 35%,107% 42%,96% 52%,100% 66%,86% 68%,84% 83%,70% 78%,60% 92%,50% 80%,40% 92%,30% 78%,16% 83%,14% 68%,0% 66%,4% 52%,-7% 42%,7% 35%,5% 20%,20% 20%,25% 6%,39% 12%);
+      animation:burstspin 24s linear infinite;
+      filter:drop-shadow(0 6px 18px rgba(245,158,11,.5));
+    }
+    @keyframes burstspin { to { transform:rotate(360deg); } }
+    .msb-kicker { font-family:'Fredoka',sans-serif; font-weight:700; font-size:clamp(16px,4vw,24px); letter-spacing:.55em; text-indent:.55em; color:#7c2d12; }
+    .msb-main {
+      font-family:'Fredoka',sans-serif; font-weight:700; font-size:clamp(44px,11vw,84px); line-height:1;
+      background:linear-gradient(180deg,#fff7ed,#fdba74); -webkit-background-clip:text; background-clip:text; color:transparent;
+      filter:drop-shadow(0 3px 0 #7c2d12) drop-shadow(0 6px 14px rgba(0,0,0,.4));
+      transform:rotate(-2deg);
+    }
+    .msb-sub2 { font-family:'Fredoka',sans-serif; font-weight:600; font-size:clamp(19px,5vw,30px); color:#fff7ed; text-shadow:0 2px 0 #7c2d12, 0 4px 12px rgba(0,0,0,.4); transform:rotate(-2deg); }
+    .pop-word {
+      position:fixed; z-index:38; pointer-events:none;
+      font-family:'Fredoka',sans-serif; font-weight:700; font-size:clamp(30px,8vw,48px);
+      color:#fde68a; -webkit-text-stroke:2px #7c2d12; text-shadow:3px 3px 0 #7c2d12;
+      animation:popword .8s ease-out forwards; white-space:nowrap;
+    }
+    @keyframes popword {
+      0%{ transform:translate(-50%,-50%) scale(.3) rotate(-10deg); opacity:0; }
+      25%{ opacity:1; }
+      100%{ transform:translate(-50%,-110%) scale(1.3) rotate(8deg); opacity:0; }
+    }
+    #liz {
+      position:absolute; bottom:max(20px, env(safe-area-inset-bottom)); right:18px; z-index:6;
+      width:66px; height:66px; border-radius:50%; font-size:38px; cursor:pointer;
+      background:rgba(255,255,255,.14); border:3px solid rgba(255,255,255,.5);
+      animation:bob 2.6s ease-in-out infinite; box-shadow:0 4px 18px rgba(0,0,0,.4);
+    }
+    #liz:active { transform:scale(1.2); }
+
+    /* ---------- fly bus ---------- */
+    #fly-bus { position:fixed; z-index:34; font-size:64px; pointer-events:none; display:none; filter:drop-shadow(0 6px 16px rgba(0,0,0,.5)); }
+  </style>
+</head>
+<body>
+  <div id="stars"></div>
+
+  <div id="hud">
+    <div id="star-count">⭐ <span id="star-num">0</span></div>
+    <button id="sound-btn" aria-label="toggle sound">🔊</button>
+  </div>
+
+  <!-- LAUNCH -->
+  <div class="scene" id="scene-launch">
+    <div class="ground"></div>
+    <div class="msb-badge"><div class="msb-burst"></div><div class="msb-kicker">THE</div><div class="msb-main">SPACE BUS</div><div class="msb-sub2">Explores the Planets!</div></div>
+    <div class="launch-sub">All aboard! Let&apos;s explore the planets!</div>
+    <div id="bus-wrap"><span id="bus"><svg viewBox="0 0 200 132" xmlns="http://www.w3.org/2000/svg" aria-label="Space Bus"><rect x="168" y="46" width="24" height="20" rx="7" fill="#94a3b8" stroke="#64748b" stroke-width="3"/><rect x="168" y="70" width="24" height="20" rx="7" fill="#94a3b8" stroke="#64748b" stroke-width="3"/><rect x="10" y="28" width="168" height="72" rx="24" fill="#FFC93C" stroke="#B87900" stroke-width="4"/><rect x="118" y="40" width="46" height="30" rx="10" fill="#BEE3F8" stroke="#B87900" stroke-width="3"/><circle cx="132" cy="53" r="5" fill="#1e1b4b"/><circle cx="150" cy="53" r="5" fill="#1e1b4b"/><circle cx="134" cy="51" r="1.6" fill="#fff"/><circle cx="152" cy="51" r="1.6" fill="#fff"/><path d="M130 62 Q141 71 152 62" stroke="#1e1b4b" stroke-width="3.5" fill="none" stroke-linecap="round"/><rect x="24" y="40" width="26" height="26" rx="7" fill="#BEE3F8" stroke="#B87900" stroke-width="3"/><rect x="56" y="40" width="26" height="26" rx="7" fill="#BEE3F8" stroke="#B87900" stroke-width="3"/><rect x="88" y="40" width="24" height="26" rx="7" fill="#BEE3F8" stroke="#B87900" stroke-width="3"/><rect x="10" y="74" width="168" height="9" fill="#F59E0B"/><circle cx="14" cy="92" r="10" fill="#ef4444" stroke="#fff" stroke-width="3"/><circle cx="52" cy="104" r="17" fill="#334155" stroke="#0f172a" stroke-width="4"/><circle cx="52" cy="104" r="7" fill="#94a3b8"/><circle cx="140" cy="104" r="17" fill="#334155" stroke="#0f172a" stroke-width="4"/><circle cx="140" cy="104" r="7" fill="#94a3b8"/><path d="M60 28 L84 12 L108 28 Z" fill="#ef4444" stroke="#B87900" stroke-width="3" stroke-linejoin="round"/></svg></span><div class="flame">🔥</div></div>
+    <button id="launch-btn">LAUNCH 🚀</button>
+  </div>
+  <div id="countdown"></div>
+
+  <!-- MAP -->
+  <div class="scene hidden" id="scene-map">
+    <div id="map-title">Where to, explorer?</div>
+    <div id="map-hint">Tap a planet! 👆</div>
+    <button id="liz" aria-label="Liz the lizard">🦎</button>
+    <div id="sun" title="Sun"></div>
+    <div id="orbits"></div>
+  </div>
+
+  <!-- PLANET -->
+  <div class="scene hidden" id="scene-planet">
+    <div id="planet-title">Mars</div>
+    <div id="planet-stage">
+      <div id="planet-big"></div>
+      <div id="hotspots"></div>
+    </div>
+    <div id="fact-bubble"></div>
+    <button id="back-btn">🚌 Back to Space</button>
+  </div>
+
+  <div id="card-scrim"></div>
+  <div id="fact-card">
+    <div id="fact-viz"></div>
+    <div id="fact-text"></div>
+    <button id="fact-ok">👍 Cool!</button>
+  </div>
+  <div id="fx-layer"></div>
+  <div id="fly-bus"><svg viewBox="0 0 200 132" xmlns="http://www.w3.org/2000/svg" aria-label="Space Bus"><rect x="168" y="46" width="24" height="20" rx="7" fill="#94a3b8" stroke="#64748b" stroke-width="3"/><rect x="168" y="70" width="24" height="20" rx="7" fill="#94a3b8" stroke="#64748b" stroke-width="3"/><rect x="10" y="28" width="168" height="72" rx="24" fill="#FFC93C" stroke="#B87900" stroke-width="4"/><rect x="118" y="40" width="46" height="30" rx="10" fill="#BEE3F8" stroke="#B87900" stroke-width="3"/><circle cx="132" cy="53" r="5" fill="#1e1b4b"/><circle cx="150" cy="53" r="5" fill="#1e1b4b"/><circle cx="134" cy="51" r="1.6" fill="#fff"/><circle cx="152" cy="51" r="1.6" fill="#fff"/><path d="M130 62 Q141 71 152 62" stroke="#1e1b4b" stroke-width="3.5" fill="none" stroke-linecap="round"/><rect x="24" y="40" width="26" height="26" rx="7" fill="#BEE3F8" stroke="#B87900" stroke-width="3"/><rect x="56" y="40" width="26" height="26" rx="7" fill="#BEE3F8" stroke="#B87900" stroke-width="3"/><rect x="88" y="40" width="24" height="26" rx="7" fill="#BEE3F8" stroke="#B87900" stroke-width="3"/><rect x="10" y="74" width="168" height="9" fill="#F59E0B"/><circle cx="14" cy="92" r="10" fill="#ef4444" stroke="#fff" stroke-width="3"/><circle cx="52" cy="104" r="17" fill="#334155" stroke="#0f172a" stroke-width="4"/><circle cx="52" cy="104" r="7" fill="#94a3b8"/><circle cx="140" cy="104" r="17" fill="#334155" stroke="#0f172a" stroke-width="4"/><circle cx="140" cy="104" r="7" fill="#94a3b8"/><path d="M60 28 L84 12 L108 28 Z" fill="#ef4444" stroke="#B87900" stroke-width="3" stroke-linejoin="round"/></svg></div>
+<script>
+(function(){
+  "use strict";
+
+  /* ================= DATA ================= */
+  /* ---- visual builders for fact cards ---- */
+  var V = {
+    big: function(emoji){ return '<div class="viz-big">'+emoji+'</div>'; },
+    meter: function(pct, bg, emoji, lo, hi){
+      return '<div class="viz-meter"><div class="viz-meter-fill" style="width:'+pct+'%;background:'+bg+';"></div>'+
+             '<div class="viz-meter-emoji">'+emoji+'</div></div>'+
+             '<div class="viz-scale"><span>'+lo+'</span><span>'+hi+'</span></div>';
+    },
+    circles: function(items){
+      var h = '<div class="viz-circles">';
+      items.forEach(function(it){
+        h += '<div class="viz-cw"><div class="viz-c" style="width:'+it.d+'px;height:'+it.d+'px;background:'+it.c+
+             ';font-size:'+Math.max(18, Math.round(it.d*0.38))+'px;">'+(it.e||'')+'</div>'+
+             '<div class="viz-cl">'+it.label+'</div></div>';
+      });
+      return h + '</div>';
+    },
+    dots: function(emoji, n, label){
+      var s = ''; for(var i=0;i<n;i++) s += '<span>'+emoji+'</span>';
+      return '<div class="viz-dots">'+s+'</div><div class="viz-cl">'+label+'</div>';
+    }
+  };
+
+  var PLANETS = [
+    { id:'mercury', name:'Mercury', size:52, c1:'#d8c3ac', c2:'#7a6a58',
+      facts:[
+        'Mercury is the closest planet to the Sun! Super hot in the daytime, freezing at night.',
+        'One day on Mercury lasts 59 Earth days! That is a really, really long day.',
+        'Mercury is the smallest planet — only a little bigger than Earth\u2019s Moon!'
+      ],
+      spots:[
+        {icon:'\u2600\ufe0f', fact:'Daytime on Mercury is hot enough to melt metal! 430 degrees!', fx:['flash','#fbbf24'], viz:V.meter(96,'linear-gradient(90deg,#fde68a,#ef4444)','\u2600\ufe0f','freezing','430\u00b0C!')},
+        {icon:'\u2744\ufe0f', fact:'At night, Mercury freezes colder than Antarctica! Minus 180 degrees!', fx:['fall','\u2744\ufe0f',14], viz:V.meter(6,'linear-gradient(90deg,#38bdf8,#1e3a8a)','\u2744\ufe0f','-180\u00b0C','warm')},
+        {icon:'🕳\ufe0f', fact:'Craters are dents left by crashing space rocks! Our Moon has them too!', fx:['burst','💥',10], viz:V.dots('🕳\ufe0f',6,'craters everywhere!')}
+      ]},
+    { id:'venus', name:'Venus', size:74, c1:'#f9dd9a', c2:'#b96a1e',
+      facts:[
+        'Venus is the hottest planet! It is wrapped in thick cloudy blankets.',
+        'Venus spins backwards! On Venus, the Sun rises in the west!',
+        'A day on Venus lasts longer than its whole year! It spins super slowly.'
+      ],
+      spots:[
+        {icon:'\u2601\ufe0f', fact:'Venus hides under thick yellow clouds all the time — we can never see its ground!', fx:['burst','\u2601\ufe0f',12], viz:V.big('\u2601\ufe0f')},
+        {icon:'🌋', fact:'Venus has more volcanoes than any other planet! Thousands and thousands!', fx:['burst','🔥',10], viz:V.dots('🌋',9,'thousands of volcanoes!')},
+        {icon:'🔄', fact:'Most planets spin one way — Venus spins the other way! What a rebel!', fx:['ring'], viz:V.big('🔄')}
+      ]},
+    { id:'earth', name:'Earth', size:78, c1:'#5db4ff', c2:'#1d4fc2', land:true,
+      facts:[
+        'Earth is our home! It is the only planet with water to drink and air to breathe.',
+        'Earth is the only planet with life! Plants, animals, and you!',
+        'From space, Earth looks like a blue marble because of all its water!'
+      ],
+      spots:[
+        {icon:'🌊', fact:'Oceans cover most of Earth! That is where whales and dolphins live!', fx:['fall','💧',16], viz:V.meter(71,'linear-gradient(90deg,#7dd3fc,#1d4fc2)','🌊','land','water 71%')},
+        {icon:'🌙', fact:'The Moon is Earth\u2019s best friend! It circles us once every month!', fx:['burst','🌙',8], viz:V.circles([{d:96,c:'#5db4ff',label:'Earth',e:'🌍'},{d:26,c:'#cbd5e1',label:'Moon',e:'🌙'}])},
+        {icon:'🐢', fact:'Millions of animals live on Earth — and it is the only planet that has any!', fx:['burst','🐢',8], viz:V.dots('🐾',8,'so many animals!')}
+      ]},
+    { id:'mars', name:'Mars', size:64, c1:'#ff9a66', c2:'#b03a1e',
+      facts:[
+        'Mars is the red planet! It is rusty, just like an old bicycle!',
+        'Mars has Olympus Mons — the tallest volcano in the whole solar system!',
+        'Little robot rovers drive around Mars, taking pictures for scientists!'
+      ],
+      spots:[
+        {icon:'🌋', fact:'Olympus Mons is three times taller than Mount Everest! The biggest volcano ever!', fx:['burst','🌋',8], viz:V.meter(100,'linear-gradient(90deg,#fdba74,#dc2626)','🌋','Everest','3\u00d7 taller!')},
+        {icon:'🤖', fact:'This little six-wheeled robot takes selfies on Mars and sends them to Earth!', fx:['ring'], viz:V.big('🤖')},
+        {icon:'🌪\ufe0f', fact:'Mars dust storms can cover the whole planet in red dust for months!', fx:['fall','🟠',16], viz:V.big('🌪\ufe0f')}
+      ]},
+    { id:'jupiter', name:'Jupiter', size:118, c1:'#f2c184', c2:'#9c5a1e', bands:true,
+      facts:[
+        'Jupiter is the biggest planet of all! Thirteen hundred Earths could fit inside!',
+        'The Great Red Spot is a storm bigger than Earth — raging for hundreds of years!',
+        'Jupiter has more than 90 moons! Its biggest moon is bigger than the planet Mercury!'
+      ],
+      spots:[
+        {icon:'🌀', fact:'The Great Red Spot is a giant hurricane wider than our whole Earth!', fx:['burst','🌀',10], viz:V.circles([{d:110,c:'#f2c184',label:'storm',e:'🌀'},{d:30,c:'#5db4ff',label:'Earth',e:'🌍'}])},
+        {icon:'🌕', fact:'Jupiter has a huge moon family — more than 90 moons and counting!', fx:['burst','🌕',10], viz:V.dots('🌕',12,'90+ moons!')},
+        {icon:'🎈', fact:'Jupiter is made mostly of gas — there is no ground to stand on! You would sink right through!', fx:['ring'], viz:V.big('🎈')}
+      ]},
+    { id:'saturn', name:'Saturn', size:104, c1:'#f4e2b0', c2:'#a87c3a', rings:true,
+      facts:[
+        'Saturn wears beautiful rings made of ice and rock!',
+        'Saturn\u2019s rings are super wide but super thin — like a giant pizza!',
+        'Saturn is so light and fluffy it would float in a giant bathtub!'
+      ],
+      spots:[
+        {icon:'💍', fact:'The rings stretch incredibly far, but they are only about as tall as a house!', fx:['ring'], viz:V.meter(100,'linear-gradient(90deg,#fde68a,#d4a373)','💍','thin','super wide!')},
+        {icon:'🧊', fact:'The rings are made of billions of icy snowballs, all sparkling in the Sun!', fx:['fall','🧊',14], viz:V.dots('🧊',10,'billions of ice balls!')},
+        {icon:'🌕', fact:'Saturn\u2019s moon Titan has rivers and rain — but made of natural gas, not water!', fx:['burst','💧',12], viz:V.big('🌕')}
+      ]},
+    { id:'uranus', name:'Uranus', size:84, c1:'#b3ecec', c2:'#3d8f8f',
+      facts:[
+        'Uranus spins tipped right over on its side, like it is doing a somersault!',
+        'Uranus is the coldest planet — minus 224 degrees! Brrr!',
+        'Uranus looks teal because of a gas called methane floating in its air!'
+      ],
+      spots:[
+        {icon:'🤸', fact:'Uranus got knocked sideways long, long ago — now it rolls around the Sun like a ball!', fx:['burst','🤸',8], viz:V.big('🤸')},
+        {icon:'🧊', fact:'Minus 224 degrees! Colder than Neptune, even though Neptune is farther away!', fx:['fall','\u2744\ufe0f',14], viz:V.meter(4,'linear-gradient(90deg,#a5f3fc,#0e7490)','🧊','-224\u00b0C','warm')},
+        {icon:'💨', fact:'Icy winds blow Uranus\u2019s clouds into stripes all around the planet!', fx:['burst','💨',10], viz:V.big('💨')}
+      ]},
+    { id:'neptune', name:'Neptune', size:82, c1:'#7db4ff', c2:'#1e3aa8',
+      facts:[
+        'Neptune is the windiest planet! Its winds blow faster than race cars!',
+        'Neptune is the farthest planet from the Sun — one year there lasts 165 Earth years!',
+        'Neptune is deep, deep blue, with giant dark storms swirling in its clouds!'
+      ],
+      spots:[
+        {icon:'💨', fact:'Neptune\u2019s winds blow 2,000 kilometers per hour! The fastest in the whole solar system!', fx:['burst','💨',12], viz:V.meter(100,'linear-gradient(90deg,#93c5fd,#1e40af)','💨','breeze','2,000 km/h!')},
+        {icon:'🔵', fact:'Neptune\u2019s deep blue color comes from the same gas that makes Uranus teal!', fx:['flash','#3b82f6'], viz:V.big('🔵')},
+        {icon:'🌊', fact:'Neptune is an ice giant — a giant ball of icy water and gas!', fx:['fall','🌊',12], viz:V.big('🌊')}
+      ]}
+  ];
+
+  /* ================= STATE ================= */
+  var soundOn = true;
+  var starCount = 0;
+  var currentPlanet = null;
+  var visited = {};
+
+  var $ = function(id){ return document.getElementById(id); };
+  var starNum = $('star-num'), fxLayer = $('fx-layer');
+
+  /* ================= AUDIO ================= */
+  var actx = null;
+  function audio(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return actx; }
+  function tone(freq, dur, type, vol, when){
+    if(!soundOn) return; var ac = audio(); if(!ac) return;
+    var t = ac.currentTime + (when||0);
+    var o = ac.createOscillator(), g = ac.createGain();
+    o.type = type||'sine'; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol||0.22, t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t+dur+0.05);
+  }
+  function sfxPop(){ tone(520,0.12,'triangle',0.25); tone(780,0.1,'triangle',0.18,0.06); }
+  function sfxTwinkle(){ tone(1320,0.15,'sine',0.2); tone(1760,0.2,'sine',0.18,0.09); }
+  function sfxWhoosh(){
+    if(!soundOn) return; var ac = audio(); if(!ac) return;
+    var t = ac.currentTime, dur = 0.7;
+    var buf = ac.createBuffer(1, ac.sampleRate*dur, ac.sampleRate);
+    var d = buf.getChannelData(0);
+    for(var i=0;i<d.length;i++){ d[i] = (Math.random()*2-1) * (1-i/d.length); }
+    var src = ac.createBufferSource(); src.buffer = buf;
+    var f = ac.createBiquadFilter(); f.type='bandpass'; f.Q.value=1.2;
+    f.frequency.setValueAtTime(300,t); f.frequency.exponentialRampToValueAtTime(3000,t+dur);
+    var g = ac.createGain(); g.gain.setValueAtTime(0.3,t); g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    src.connect(f); f.connect(g); g.connect(ac.destination); src.start(t);
+  }
+  function sfxRumble(){
+    if(!soundOn) return; var ac = audio(); if(!ac) return;
+    var t = ac.currentTime, dur = 1.6;
+    var o = ac.createOscillator(), g = ac.createGain();
+    o.type='sawtooth'; o.frequency.setValueAtTime(55,t); o.frequency.linearRampToValueAtTime(220,t+dur);
+    g.gain.setValueAtTime(0.25,t); g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t+dur+0.05);
+  }
+  function sfxDing(){ tone(880,0.25,'sine',0.2); tone(1174,0.3,'sine',0.16,0.12); }
+
+  /* ================= SPEECH ================= */
+  var voice = null;
+  function pickVoice(){
+    try{
+      var vs = window.speechSynthesis.getVoices();
+      if(!vs.length) return;
+      var prefs = [/^samantha$/i, /google us english/i, /google uk english female/i, /siri/i, /female/i];
+      var best = null;
+      outer:
+      for(var p=0;p<prefs.length;p++){
+        for(var i=0;i<vs.length;i++){
+          if(/^en/i.test(vs[i].lang) && prefs[p].test(vs[i].name)){ best = vs[i]; break outer; }
+        }
+      }
+      if(!best){ for(var j=0;j<vs.length;j++){ if(/^en/i.test(vs[j].lang)){ best = vs[j]; break; } } }
+      if(best) voice = best;
+    }catch(e){}
+  }
+  if('speechSynthesis' in window){ pickVoice(); window.speechSynthesis.onvoiceschanged = pickVoice; }
+  function say(text){
+    if(!soundOn || !('speechSynthesis' in window)) return;
+    try{
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      if(voice) u.voice = voice;
+      u.rate = 1.0; u.pitch = 1.0; u.volume = 1;
+      window.speechSynthesis.speak(u);
+    }catch(e){}
+  }
+
+  /* ================= FX ================= */
+  function fxFlash(color){
+    var d = document.createElement('div'); d.className='fx-flash'; d.style.background = color||'#fff';
+    fxLayer.appendChild(d); setTimeout(function(){ d.remove(); }, 550);
+  }
+  function fxBurst(emoji, n){
+    for(var i=0;i<n;i++){
+      (function(){
+        var d = document.createElement('div'); d.className='fx-particle'; d.textContent = emoji;
+        d.style.left = '50%'; d.style.top = '46%';
+        var ang = Math.random()*Math.PI*2, dist = 90+Math.random()*160;
+        d.style.setProperty('--dx', Math.cos(ang)*dist+'px');
+        d.style.setProperty('--dy', Math.sin(ang)*dist+'px');
+        fxLayer.appendChild(d); setTimeout(function(){ d.remove(); }, 1050);
+      })();
+    }
+  }
+  function fxFall(emoji, n){
+    for(var i=0;i<n;i++){
+      (function(k){
+        var d = document.createElement('div'); d.className='fx-fall'; d.textContent = emoji;
+        d.style.left = (Math.random()*92)+'vw';
+        d.style.animationDelay = (k*0.09)+'s';
+        fxLayer.appendChild(d); setTimeout(function(){ d.remove(); }, 2600);
+      })(i);
+    }
+  }
+  function fxRing(){
+    var d = document.createElement('div'); d.className='fx-ring';
+    fxLayer.appendChild(d); setTimeout(function(){ d.remove(); }, 850);
+  }
+  function runFx(fx){
+    if(!fx) return;
+    if(fx[0]==='flash') fxFlash(fx[1]);
+    else if(fx[0]==='burst') fxBurst(fx[1], fx[2]||10);
+    else if(fx[0]==='fall') fxFall(fx[1], fx[2]||12);
+    else if(fx[0]==='ring') fxRing();
+  }
+  function showFact(text, ms){
+    var b = $('fact-bubble'); b.textContent = text; b.classList.add('show');
+    clearTimeout(b._t); b._t = setTimeout(function(){ b.classList.remove('show'); }, ms||4200);
+  }
+
+  /* ================= STARFIELD ================= */
+  function buildStars(){
+    var c = $('stars'); c.innerHTML = '';
+    for(var i=0;i<110;i++){
+      var s = document.createElement('div'); s.className='star-dot';
+      var sz = 1+Math.random()*3;
+      s.style.width = s.style.height = sz+'px';
+      s.style.left = Math.random()*100+'vw'; s.style.top = Math.random()*100+'vh';
+      s.style.setProperty('--tw', (2+Math.random()*3)+'s');
+      s.style.animationDelay = (Math.random()*3)+'s';
+      c.appendChild(s);
+    }
+  }
+
+  /* ================= COLLECTIBLE STARS ================= */
+  function spawnCollectStar(){
+    document.querySelectorAll('.collect-star').forEach(function(e){ e.remove(); });
+    var n = 2 + Math.floor(Math.random()*2);
+    for(var i=0;i<n;i++){
+      var s = document.createElement('div'); s.className='collect-star'; s.textContent='⭐';
+      s.style.left = (8+Math.random()*78)+'vw';
+      s.style.top = (16+Math.random()*55)+'vh';
+      s.style.animationDelay = (Math.random()*2)+'s';
+      s.addEventListener('pointerdown', function(e){
+        e.stopPropagation();
+        var el = this; if(el.classList.contains('caught')) return;
+        el.classList.add('caught'); sfxTwinkle(); popWord(e.clientX, e.clientY);
+        starCount++; starNum.textContent = starCount;
+        if(starCount % 10 === 0){ say('Wow! '+starCount+' stars! Amazing!'); showFact('⭐ '+starCount+' stars! Amazing!'); }
+        setTimeout(function(){ el.remove(); }, 350);
+        setTimeout(spawnCollectStar, 2500);
+      });
+      document.body.appendChild(s);
+    }
+  }
+
+  /* ================= SCENES ================= */
+  function show(id){
+    ['scene-launch','scene-map','scene-planet'].forEach(function(s){
+      $(s).classList.toggle('hidden', s!==id);
+    });
+  }
+
+  /* ---- launch ---- */
+  $('launch-btn').addEventListener('click', function(){
+    sfxPop();
+    say('All aboard the Space Bus! Three! Two! One! Blast off!');
+    var cd = $('countdown'), wrap = $('bus-wrap');
+    var seq = ['3','2','1','🚀'], i = 0;
+    cd.classList.add('show');
+    function step(){
+      if(i < seq.length){
+        cd.textContent = seq[i]; cd.classList.remove('pop'); void cd.offsetWidth; cd.classList.add('pop');
+        tone(440+i*110, 0.25, 'square', 0.16);
+        i++; setTimeout(step, 900);
+      } else {
+        cd.classList.remove('show');
+        wrap.classList.add('shake'); sfxRumble();
+        setTimeout(function(){ wrap.classList.remove('shake'); wrap.classList.add('liftoff'); sfxWhoosh(); }, 1400);
+        setTimeout(function(){ enterMap(); wrap.classList.remove('liftoff'); }, 3000);
+      }
+    }
+    step();
+    this.style.visibility = 'hidden';
+  });
+
+  /* ---- map ---- */
+  function planetBallStyle(p){
+    var bg = 'radial-gradient(circle at 35% 32%, '+p.c1+', '+p.c2+' 78%)';
+    if(p.bands) bg = 'repeating-radial-gradient(circle at 50% 42%, '+p.c1+' 0 9px, '+p.c2+' 9px 18px)';
+    if(p.land) bg = 'radial-gradient(circle at 35% 30%, #7ddf8a 0 18%, '+p.c1+' 26%, '+p.c2+' 80%)';
+    return bg;
+  }
+  function enterMap(){
+    show('scene-map');
+    say('Where to, explorer? Tap a planet!');
+    var orbits = $('orbits'); orbits.innerHTML = '';
+    var sun = $('sun');
+    // lay planets on a phone-safe ellipse around the sun
+    var cx = 50, cy = 52, rx = 26, ry = 24;
+    PLANETS.forEach(function(p, i){
+      var ang = (-90 + i*(360/PLANETS.length)) * Math.PI/180;
+      var x = cx + Math.cos(ang)*rx, y = cy + Math.sin(ang)*ry;
+      var b = document.createElement('button');
+      b.className = 'planet-btn' + (visited[p.id] ? ' visited' : '');
+      b.style.left = 'calc('+x+'% - 60px)'; b.style.top = 'calc('+y+'% - 60px)';
+      b.setAttribute('aria-label', p.name);
+      var ball = document.createElement('div');
+      ball.className = 'planet-ball';
+      ball.style.width = ball.style.height = p.size+'px';
+      ball.style.background = planetBallStyle(p);
+      if(p.rings){ var r = document.createElement('div'); r.className='saturn-ring'; ball.appendChild(r); }
+      var nm = document.createElement('div'); nm.className='planet-name'; nm.textContent = p.name;
+      b.appendChild(ball); b.appendChild(nm);
+      b.addEventListener('click', function(){ flyTo(p, b); });
+      orbits.appendChild(b);
+    });
+    // sun hotspot
+    sun.onclick = function(){ sfxPop(); fxFlash('#fbbf24'); say('The Sun! It is a giant star! So bright and warm!'); showFact('☀️ The Sun is a giant star!'); };
+    spawnCollectStar();
+  }
+
+  var flyEl = $('fly-bus');
+  function flyTo(p, btn){
+    sfxWhoosh();
+    var r = btn.getBoundingClientRect();
+    flyEl.style.display = 'block';
+    flyEl.style.left = (window.innerWidth/2 - 32)+'px';
+    flyEl.style.top = (window.innerHeight - 140)+'px';
+    flyEl.style.transition = 'none';
+    requestAnimationFrame(function(){
+      flyEl.style.transition = 'left .85s cubic-bezier(.4,0,.6,1), top .85s cubic-bezier(.4,0,.6,1), transform .85s';
+      flyEl.style.left = (r.left + r.width/2 - 32)+'px';
+      flyEl.style.top = (r.top + r.height/2 - 32)+'px';
+      flyEl.style.transform = 'scale(1.4) rotate(-18deg)';
+    });
+    setTimeout(function(){
+      flyEl.style.display='none'; flyEl.style.transform='';
+      enterPlanet(p);
+    }, 900);
+  }
+
+  /* ---- planet ---- */
+  function enterPlanet(p){
+    currentPlanet = p; visited[p.id] = true;
+    show('scene-planet');
+    $('planet-title').textContent = p.name;
+    var big = $('planet-big');
+    big.style.background = planetBallStyle(p);
+    // saturn ring on big planet
+    var old = big.querySelector('.saturn-ring'); if(old) old.remove();
+    if(p.rings){ var r = document.createElement('div'); r.className='saturn-ring'; big.appendChild(r); }
+    big.onclick = function(){
+      sfxPop(); big.classList.remove('wobble'); void big.offsetWidth; big.classList.add('wobble');
+      fxRing(); popWord(window.innerWidth/2, window.innerHeight*0.3);
+      p._fi = (p._fi || 0);
+      var fact = p.facts[p._fi % p.facts.length]; p._fi++;
+      say(fact); showFact(fact, 5600);
+    };
+    var hs = $('hotspots'); hs.innerHTML = '';
+    var pos = [ {l:'6%',t:'4%'}, {l:'68%',t:'10%'}, {l:'36%',t:'66%'} ];
+    p.spots.forEach(function(s, i){
+      var d = document.createElement('button');
+      d.className = 'hotspot'; d.textContent = s.icon;
+      d.style.left = pos[i].l; d.style.top = pos[i].t;
+      d.style.animationDelay = (i*0.5)+'s';
+      d.setAttribute('aria-label', s.fact);
+      d.addEventListener('click', function(e){
+        e.stopPropagation();
+        sfxPop(); runFx(s.fx); popWord(e.clientX, e.clientY); openCard(s);
+      });
+      hs.appendChild(d);
+    });
+    say('Welcome to '+p.name+'! Tap the planet and the buttons!');
+    showFact('👆 Tap the planet and the buttons!', 3600);
+    spawnCollectStar();
+  }
+  $('back-btn').addEventListener('click', function(){
+    sfxWhoosh(); say('Back to space we go!'); enterMap();
+  });
+  $('sun').addEventListener('click', function(){});
+
+  /* ---- fact card ---- */
+  function openCard(spot){
+    $('fact-viz').innerHTML = spot.viz || V.big(spot.icon);
+    $('fact-text').textContent = spot.fact;
+    $('card-scrim').classList.add('show');
+    $('fact-card').classList.add('show');
+    say(spot.fact);
+  }
+  function closeCard(){
+    $('card-scrim').classList.remove('show');
+    $('fact-card').classList.remove('show');
+    if('speechSynthesis' in window){ try{ window.speechSynthesis.cancel(); }catch(e){} }
+  }
+  $('fact-ok').addEventListener('click', function(e){ e.stopPropagation(); sfxPop(); closeCard(); });
+  $('card-scrim').addEventListener('click', closeCard);
+
+  /* ---- comic pop words ---- */
+  var POP_WORDS = ['POP!','WOW!','COOL!','YAY!','BAM!','WHEE!'];
+  function popWord(x, y){
+    var d = document.createElement('div'); d.className = 'pop-word';
+    d.textContent = POP_WORDS[Math.floor(Math.random()*POP_WORDS.length)];
+    d.style.left = x+'px'; d.style.top = y+'px';
+    document.body.appendChild(d);
+    setTimeout(function(){ d.remove(); }, 850);
+  }
+
+  /* ---- Liz the lizard guide ---- */
+  var LIZ_TIPS = [
+    'Psst! Tap the Sun — it is a star, not a planet!',
+    'Collect the shiny stars! How many can you get?',
+    'Tap a planet to ride the Space Bus there!',
+    'See the checkmarks? Those are planets you already visited!'
+  ];
+  var _liz = $('liz');
+  if(_liz){ _liz.addEventListener('click', function(e){
+    e.stopPropagation(); sfxPop();
+    popWord(e.clientX || window.innerWidth-60, e.clientY || window.innerHeight-120);
+    say(LIZ_TIPS[Math.floor(Math.random()*LIZ_TIPS.length)]);
+  }); }
+
+  /* ---- sound toggle ---- */
+  $('sound-btn').addEventListener('click', function(){
+    soundOn = !soundOn;
+    this.textContent = soundOn ? '🔊' : '🔇';
+    if(!soundOn && 'speechSynthesis' in window){ try{ window.speechSynthesis.cancel(); }catch(e){} }
+    if(soundOn) sfxPop();
+  });
+
+  /* ---- keep stars twinkling behind everything ---- */
+  buildStars();
+  // gentle parallax on device tilt (optional, harmless)
+  window.addEventListener('deviceorientation', function(){});
+})();
+</script>
+</body>
+</html>
