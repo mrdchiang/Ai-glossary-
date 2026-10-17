@@ -199,6 +199,38 @@
     }
     @keyframes fxring { to { width:340px; height:340px; opacity:0; } }
 
+    /* ---------- fact card ---------- */
+    #card-scrim { position:fixed; inset:0; z-index:36; background:rgba(4,6,24,.62); opacity:0; pointer-events:none; transition:opacity .25s; }
+    #card-scrim.show { opacity:1; pointer-events:auto; }
+    #fact-card {
+      position:fixed; left:50%; top:50%; z-index:37; width:min(88vw,420px);
+      transform:translate(-50%,-50%) scale(.7); opacity:0; pointer-events:none;
+      background:linear-gradient(180deg,#ffffff,#eef2ff); color:#1e1b4b; border-radius:28px;
+      padding:24px 22px 20px; text-align:center; box-shadow:0 24px 70px rgba(0,0,0,.55);
+      transition:transform .28s cubic-bezier(.34,1.56,.64,1), opacity .2s;
+    }
+    #fact-card.show { transform:translate(-50%,-50%) scale(1); opacity:1; pointer-events:auto; }
+    #fact-viz { min-height:120px; display:flex; flex-direction:column; align-items:center; justify-content:center; margin-bottom:12px; }
+    .viz-big { font-size:84px; animation:bob 2s ease-in-out infinite; }
+    .viz-meter { position:relative; width:100%; height:34px; background:#e2e8f0; border-radius:999px; margin:14px 0 4px; }
+    .viz-meter-fill { height:100%; border-radius:999px; }
+    .viz-meter-emoji { position:absolute; right:-6px; top:-18px; font-size:36px; }
+    .viz-scale { display:flex; justify-content:space-between; font-weight:900; font-size:14px; color:#64748b; padding:0 4px; }
+    .viz-circles { display:flex; align-items:flex-end; justify-content:center; gap:26px; }
+    .viz-cw { display:flex; flex-direction:column; align-items:center; gap:6px; }
+    .viz-c { border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:inset -6px -8px 16px rgba(0,0,0,.3); }
+    .viz-cl { font-weight:900; font-size:15px; color:#475569; }
+    .viz-dots { font-size:32px; line-height:1.55; max-width:290px; }
+    .viz-dots span { display:inline-block; animation:bob 2.4s ease-in-out infinite; }
+    .viz-dots span:nth-child(even) { animation-delay:.6s; }
+    #fact-text { font-weight:800; font-size:clamp(17px,4.4vw,21px); line-height:1.45; margin-bottom:16px; }
+    #fact-ok {
+      font-family:'Fredoka',sans-serif; font-weight:700; font-size:22px; color:#fff;
+      background:linear-gradient(180deg,#22c55e,#16a34a); border:none; border-radius:999px; padding:14px 44px;
+      box-shadow:0 5px 0 #15803d; cursor:pointer;
+    }
+    #fact-ok:active { transform:translateY(4px); box-shadow:0 1px 0 #15803d; }
+
     /* ---------- fly bus ---------- */
     #fly-bus { position:fixed; z-index:34; font-size:64px; pointer-events:none; display:none; filter:drop-shadow(0 6px 16px rgba(0,0,0,.5)); }
   </style>
@@ -240,6 +272,12 @@
     <button id="back-btn">🚌 Back to Space</button>
   </div>
 
+  <div id="card-scrim"></div>
+  <div id="fact-card">
+    <div id="fact-viz"></div>
+    <div id="fact-text"></div>
+    <button id="fact-ok">\U0001f44d Cool!</button>
+  </div>
   <div id="fx-layer"></div>
   <div id="fly-bus">🚌</div>
 <script>
@@ -247,62 +285,117 @@
   "use strict";
 
   /* ================= DATA ================= */
+  /* ---- visual builders for fact cards ---- */
+  var V = {
+    big: function(emoji){ return '<div class="viz-big">'+emoji+'</div>'; },
+    meter: function(pct, bg, emoji, lo, hi){
+      return '<div class="viz-meter"><div class="viz-meter-fill" style="width:'+pct+'%;background:'+bg+';"></div>'+
+             '<div class="viz-meter-emoji">'+emoji+'</div></div>'+
+             '<div class="viz-scale"><span>'+lo+'</span><span>'+hi+'</span></div>';
+    },
+    circles: function(items){
+      var h = '<div class="viz-circles">';
+      items.forEach(function(it){
+        h += '<div class="viz-cw"><div class="viz-c" style="width:'+it.d+'px;height:'+it.d+'px;background:'+it.c+
+             ';font-size:'+Math.max(18, Math.round(it.d*0.38))+'px;">'+(it.e||'')+'</div>'+
+             '<div class="viz-cl">'+it.label+'</div></div>';
+      });
+      return h + '</div>';
+    },
+    dots: function(emoji, n, label){
+      var s = ''; for(var i=0;i<n;i++) s += '<span>'+emoji+'</span>';
+      return '<div class="viz-dots">'+s+'</div><div class="viz-cl">'+label+'</div>';
+    }
+  };
+
   var PLANETS = [
     { id:'mercury', name:'Mercury', size:52, c1:'#d8c3ac', c2:'#7a6a58',
-      fact:'Mercury is the closest planet to the Sun! Super hot in the daytime, freezing at night.',
+      facts:[
+        'Mercury is the closest planet to the Sun! Super hot in the daytime, freezing at night.',
+        'One day on Mercury lasts 59 Earth days! That is a really, really long day.',
+        'Mercury is the smallest planet — only a little bigger than Earth\u2019s Moon!'
+      ],
       spots:[
-        {icon:'☀️', say:'So hot! Sizzle sizzle!', fx:['flash','#fbbf24']},
-        {icon:'❄️', say:'Brrr! Freezing cold!', fx:['fall','❄️',14]},
-        {icon:'🕳️', say:'Boom! A space rock made this big hole!', fx:['burst','💥',10]}
+        {icon:'\u2600\ufe0f', fact:'Daytime on Mercury is hot enough to melt metal! 430 degrees!', fx:['flash','#fbbf24'], viz:V.meter(96,'linear-gradient(90deg,#fde68a,#ef4444)','\u2600\ufe0f','freezing','430\u00b0C!')},
+        {icon:'\u2744\ufe0f', fact:'At night, Mercury freezes colder than Antarctica! Minus 180 degrees!', fx:['fall','\u2744\ufe0f',14], viz:V.meter(6,'linear-gradient(90deg,#38bdf8,#1e3a8a)','\u2744\ufe0f','-180\u00b0C','warm')},
+        {icon:'\U0001f573\ufe0f', fact:'Craters are dents left by crashing space rocks! Our Moon has them too!', fx:['burst','\U0001f4a5',10], viz:V.dots('\U0001f573\ufe0f',6,'craters everywhere!')}
       ]},
     { id:'venus', name:'Venus', size:74, c1:'#f9dd9a', c2:'#b96a1e',
-      fact:'Venus is the hottest planet! It is wrapped in thick cloudy blankets.',
+      facts:[
+        'Venus is the hottest planet! It is wrapped in thick cloudy blankets.',
+        'Venus spins backwards! On Venus, the Sun rises in the west!',
+        'A day on Venus lasts longer than its whole year! It spins super slowly.'
+      ],
       spots:[
-        {icon:'☁️', say:'Thick cloudy blankets! So fluffy!', fx:['burst','☁️',12]},
-        {icon:'🌋', say:'Volcanoes everywhere! Rumble rumble!', fx:['burst','🔥',10]},
-        {icon:'🔄', say:'Venus spins backwards! Wheee!', fx:['ring']}
+        {icon:'\u2601\ufe0f', fact:'Venus hides under thick yellow clouds all the time — we can never see its ground!', fx:['burst','\u2601\ufe0f',12], viz:V.big('\u2601\ufe0f')},
+        {icon:'\U0001f30b', fact:'Venus has more volcanoes than any other planet! Thousands and thousands!', fx:['burst','\U0001f525',10], viz:V.dots('\U0001f30b',9,'thousands of volcanoes!')},
+        {icon:'\U0001f504', fact:'Most planets spin one way — Venus spins the other way! What a rebel!', fx:['ring'], viz:V.big('\U0001f504')}
       ]},
     { id:'earth', name:'Earth', size:78, c1:'#5db4ff', c2:'#1d4fc2', land:true,
-      fact:'Earth is our home! It is the only planet with water to drink and air to breathe.',
+      facts:[
+        'Earth is our home! It is the only planet with water to drink and air to breathe.',
+        'Earth is the only planet with life! Plants, animals, and you!',
+        'From space, Earth looks like a blue marble because of all its water!'
+      ],
       spots:[
-        {icon:'🌊', say:'Splish splash! Water, water everywhere!', fx:['fall','💧',16]},
-        {icon:'🌙', say:'Hello, Moon! Our shiny night-light!', fx:['burst','🌙',8]},
-        {icon:'🐢', say:'Earth is the only planet with animals! Hi, friends!', fx:['burst','🐢',8]}
+        {icon:'\U0001f30a', fact:'Oceans cover most of Earth! That is where whales and dolphins live!', fx:['fall','\U0001f4a7',16], viz:V.meter(71,'linear-gradient(90deg,#7dd3fc,#1d4fc2)','\U0001f30a','land','water 71%')},
+        {icon:'\U0001f319', fact:'The Moon is Earth\u2019s best friend! It circles us once every month!', fx:['burst','\U0001f319',8], viz:V.circles([{d:96,c:'#5db4ff',label:'Earth',e:'\U0001f30d'},{d:26,c:'#cbd5e1',label:'Moon',e:'\U0001f319'}])},
+        {icon:'\U0001f422', fact:'Millions of animals live on Earth — and it is the only planet that has any!', fx:['burst','\U0001f422',8], viz:V.dots('\U0001f43e',8,'so many animals!')}
       ]},
     { id:'mars', name:'Mars', size:64, c1:'#ff9a66', c2:'#b03a1e',
-      fact:'Mars is the red planet! It has the biggest volcano in the whole solar system.',
+      facts:[
+        'Mars is the red planet! It is rusty, just like an old bicycle!',
+        'Mars has Olympus Mons — the tallest volcano in the whole solar system!',
+        'Little robot rovers drive around Mars, taking pictures for scientists!'
+      ],
       spots:[
-        {icon:'🌋', say:'The biggest volcano ever! Ka-boom!', fx:['burst','🌋',8]},
-        {icon:'🤖', say:'Beep boop! The little rover says hello!', fx:['ring']},
-        {icon:'🌪️', say:'Whoosh! A big dusty storm!', fx:['fall','🟠',16]}
+        {icon:'\U0001f30b', fact:'Olympus Mons is three times taller than Mount Everest! The biggest volcano ever!', fx:['burst','\U0001f30b',8], viz:V.meter(100,'linear-gradient(90deg,#fdba74,#dc2626)','\U0001f30b','Everest','3\u00d7 taller!')},
+        {icon:'\U0001f916', fact:'This little six-wheeled robot takes selfies on Mars and sends them to Earth!', fx:['ring'], viz:V.big('\U0001f916')},
+        {icon:'\U0001f32a\ufe0f', fact:'Mars dust storms can cover the whole planet in red dust for months!', fx:['fall','\U0001f7e0',16], viz:V.big('\U0001f32a\ufe0f')}
       ]},
     { id:'jupiter', name:'Jupiter', size:118, c1:'#f2c184', c2:'#9c5a1e', bands:true,
-      fact:'Jupiter is the biggest planet of all! Its giant storm is bigger than Earth!',
+      facts:[
+        'Jupiter is the biggest planet of all! Thirteen hundred Earths could fit inside!',
+        'The Great Red Spot is a storm bigger than Earth — raging for hundreds of years!',
+        'Jupiter has more than 90 moons! Its biggest moon is bigger than the planet Mercury!'
+      ],
       spots:[
-        {icon:'🌀', say:'A storm bigger than Earth! Whoosh!', fx:['burst','🌀',10]},
-        {icon:'🌕', say:'Jupiter has lots and lots of moons!', fx:['burst','🌕',10]},
-        {icon:'🎈', say:'Jupiter is a giant ball of gas! Boing boing!', fx:['ring']}
+        {icon:'\U0001f300', fact:'The Great Red Spot is a giant hurricane wider than our whole Earth!', fx:['burst','\U0001f300',10], viz:V.circles([{d:110,c:'#f2c184',label:'storm',e:'\U0001f300'},{d:30,c:'#5db4ff',label:'Earth',e:'\U0001f30d'}])},
+        {icon:'\U0001f315', fact:'Jupiter has a huge moon family — more than 90 moons and counting!', fx:['burst','\U0001f315',10], viz:V.dots('\U0001f315',12,'90+ moons!')},
+        {icon:'\U0001f388', fact:'Jupiter is made mostly of gas — there is no ground to stand on! You would sink right through!', fx:['ring'], viz:V.big('\U0001f388')}
       ]},
     { id:'saturn', name:'Saturn', size:104, c1:'#f4e2b0', c2:'#a87c3a', rings:true,
-      fact:'Saturn wears beautiful rings made of ice and rocks! Some are tiny like dust, some are big like houses.',
+      facts:[
+        'Saturn wears beautiful rings made of ice and rock!',
+        'Saturn\u2019s rings are super wide but super thin — like a giant pizza!',
+        'Saturn is so light and fluffy it would float in a giant bathtub!'
+      ],
       spots:[
-        {icon:'💍', say:'Icy rings! Round and round they go!', fx:['ring']},
-        {icon:'🧊', say:'Clink clink! Space ice cubes!', fx:['fall','🧊',14]},
-        {icon:'🌕', say:'Saturn\u2019s moon Titan has rivers and rain!', fx:['burst','💧',12]}
+        {icon:'\U0001f48d', fact:'The rings stretch incredibly far, but they are only about as tall as a house!', fx:['ring'], viz:V.meter(100,'linear-gradient(90deg,#fde68a,#d4a373)','\U0001f48d','thin','super wide!')},
+        {icon:'\U0001f9ca', fact:'The rings are made of billions of icy snowballs, all sparkling in the Sun!', fx:['fall','\U0001f9ca',14], viz:V.dots('\U0001f9ca',10,'billions of ice balls!')},
+        {icon:'\U0001f315', fact:'Saturn\u2019s moon Titan has rivers and rain — but made of natural gas, not water!', fx:['burst','\U0001f4a7',12], viz:V.big('\U0001f315')}
       ]},
     { id:'uranus', name:'Uranus', size:84, c1:'#b3ecec', c2:'#3d8f8f',
-      fact:'Uranus spins tipped right over on its side, like it is doing a somersault!',
+      facts:[
+        'Uranus spins tipped right over on its side, like it is doing a somersault!',
+        'Uranus is the coldest planet — minus 224 degrees! Brrr!',
+        'Uranus looks teal because of a gas called methane floating in its air!'
+      ],
       spots:[
-        {icon:'🤸', say:'Somersault! Uranus rolls around the Sun!', fx:['burst','🤸',8]},
-        {icon:'🧊', say:'Brrr! The coldest planet of all!', fx:['fall','❄️',14]},
-        {icon:'💨', say:'Whoosh! Windy, windy!', fx:['burst','💨',10]}
+        {icon:'\U0001f938', fact:'Uranus got knocked sideways long, long ago — now it rolls around the Sun like a ball!', fx:['burst','\U0001f938',8], viz:V.big('\U0001f938')},
+        {icon:'\U0001f9ca', fact:'Minus 224 degrees! Colder than Neptune, even though Neptune is farther away!', fx:['fall','\u2744\ufe0f',14], viz:V.meter(4,'linear-gradient(90deg,#a5f3fc,#0e7490)','\U0001f9ca','-224\u00b0C','warm')},
+        {icon:'\U0001f4a8', fact:'Icy winds blow Uranus\u2019s clouds into stripes all around the planet!', fx:['burst','\U0001f4a8',10], viz:V.big('\U0001f4a8')}
       ]},
     { id:'neptune', name:'Neptune', size:82, c1:'#7db4ff', c2:'#1e3aa8',
-      fact:'Neptune is the windiest planet! Its winds blow faster than race cars!',
+      facts:[
+        'Neptune is the windiest planet! Its winds blow faster than race cars!',
+        'Neptune is the farthest planet from the Sun — one year there lasts 165 Earth years!',
+        'Neptune is deep, deep blue, with giant dark storms swirling in its clouds!'
+      ],
       spots:[
-        {icon:'💨', say:'The fastest winds ever! Hold on tight!', fx:['burst','💨',12]},
-        {icon:'🔵', say:'So blue and beautiful!', fx:['flash','#3b82f6']},
-        {icon:'🌊', say:'Splash! Deep blue waves!', fx:['fall','🌊',12]}
+        {icon:'\U0001f4a8', fact:'Neptune\u2019s winds blow 2,000 kilometers per hour! The fastest in the whole solar system!', fx:['burst','\U0001f4a8',12], viz:V.meter(100,'linear-gradient(90deg,#93c5fd,#1e40af)','\U0001f4a8','breeze','2,000 km/h!')},
+        {icon:'\U0001f535', fact:'Neptune\u2019s deep blue color comes from the same gas that makes Uranus teal!', fx:['flash','#3b82f6'], viz:V.big('\U0001f535')},
+        {icon:'\U0001f30a', fact:'Neptune is an ice giant — a giant ball of icy water and gas!', fx:['fall','\U0001f30a',12], viz:V.big('\U0001f30a')}
       ]}
   ];
 
@@ -357,8 +450,19 @@
   function pickVoice(){
     try{
       var vs = window.speechSynthesis.getVoices();
-      for(var i=0;i<vs.length;i++){ if(/en[-_]US/i.test(vs[i].lang) && /female|samantha|google us english|zira/i.test(vs[i].name)) { voice = vs[i]; return; } }
-      for(var j=0;j<vs.length;j++){ if(/^en/i.test(vs[j].lang)){ voice = vs[j]; return; } }
+      var best = null, bestScore = -1000;
+      for(var i=0;i<vs.length;i++){
+        var v = vs[i], nm = (v.name+' '+v.lang).toLowerCase(), sc = 0;
+        if(!/^en/i.test(v.lang)) sc -= 100;
+        if(/siri/.test(nm)) sc += 60;
+        if(/natural|neural/.test(nm)) sc += 45;
+        if(/google us english|google uk english female/.test(nm)) sc += 25;
+        if(v.localService === false) sc += 15;
+        if(/samantha|zira|david|mark|alex/.test(nm)) sc -= 12;
+        if(/^en[-_]us/i.test(v.lang)) sc += 8;
+        if(sc > bestScore){ bestScore = sc; best = v; }
+      }
+      voice = best;
     }catch(e){}
   }
   if('speechSynthesis' in window){ pickVoice(); window.speechSynthesis.onvoiceschanged = pickVoice; }
@@ -368,7 +472,7 @@
       window.speechSynthesis.cancel();
       var u = new SpeechSynthesisUtterance(text);
       if(voice) u.voice = voice;
-      u.rate = 0.98; u.pitch = 1.15; u.volume = 1;
+      u.rate = 0.95; u.pitch = 1.05; u.volume = 1;
       window.speechSynthesis.speak(u);
     }catch(e){}
   }
@@ -550,7 +654,10 @@
     if(p.rings){ var r = document.createElement('div'); r.className='saturn-ring'; big.appendChild(r); }
     big.onclick = function(){
       sfxPop(); big.classList.remove('wobble'); void big.offsetWidth; big.classList.add('wobble');
-      fxRing(); say(p.fact); showFact(p.fact, 5200);
+      fxRing();
+      p._fi = (p._fi || 0);
+      var fact = p.facts[p._fi % p.facts.length]; p._fi++;
+      say(fact); showFact(fact, 5600);
     };
     var hs = $('hotspots'); hs.innerHTML = '';
     var pos = [ {l:'6%',t:'4%'}, {l:'68%',t:'10%'}, {l:'36%',t:'66%'} ];
@@ -559,10 +666,10 @@
       d.className = 'hotspot'; d.textContent = s.icon;
       d.style.left = pos[i].l; d.style.top = pos[i].t;
       d.style.animationDelay = (i*0.5)+'s';
-      d.setAttribute('aria-label', s.say);
+      d.setAttribute('aria-label', s.fact);
       d.addEventListener('click', function(e){
         e.stopPropagation();
-        sfxPop(); runFx(s.fx); say(s.say); showFact(s.icon+' '+s.say);
+        sfxPop(); runFx(s.fx); openCard(s);
       });
       hs.appendChild(d);
     });
@@ -574,6 +681,22 @@
     sfxWhoosh(); say('Back to space we go!'); enterMap();
   });
   $('sun').addEventListener('click', function(){});
+
+  /* ---- fact card ---- */
+  function openCard(spot){
+    $('fact-viz').innerHTML = spot.viz || V.big(spot.icon);
+    $('fact-text').textContent = spot.fact;
+    $('card-scrim').classList.add('show');
+    $('fact-card').classList.add('show');
+    say(spot.fact);
+  }
+  function closeCard(){
+    $('card-scrim').classList.remove('show');
+    $('fact-card').classList.remove('show');
+    if('speechSynthesis' in window){ try{ window.speechSynthesis.cancel(); }catch(e){} }
+  }
+  $('fact-ok').addEventListener('click', function(e){ e.stopPropagation(); sfxPop(); closeCard(); });
+  $('card-scrim').addEventListener('click', closeCard);
 
   /* ---- sound toggle ---- */
   $('sound-btn').addEventListener('click', function(){
